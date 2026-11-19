@@ -1,6 +1,7 @@
 import { watchAuth } from "./auth.js";
 import { getProject } from "./projects.js";
-import { block, clean, text, LIST_CSS, LIST_LABELS, loadChapters, saveChapter, removeChapter } from "./doc-model.js";
+import { block, clean, text, LIST_CSS, LIST_LABELS, loadChapters, saveChapter, removeChapter, ensureDefaults, saveMeta, DEFAULT_FORMAT } from "./doc-model.js";
+import { renderSpecial } from "./frontmatter.js";
 
 const $ = (s) => document.querySelector(s);
 const pid = new URLSearchParams(location.search).get("id");
@@ -30,7 +31,7 @@ async function flush() {
   clearTimeout(saveT); commitNow(); if (!dirty.size) return;
   const ids = [...dirty]; dirty.clear(); setState("saving");
   try {
-    await Promise.all(ids.map((id) => { const c = chs.find((x) => x.id === id); return c && saveChapter(pid, c); }));
+    await Promise.all(ids.map((id) => { const c = chs.find((x) => x.id === id); return id === "__meta" ? saveMeta(pid, project) : c && saveChapter(pid, c); }));
     setState(dirty.size ? "unsaved" : "saved");
   } catch (e) { console.error(e); ids.forEach((i) => dirty.add(i)); setState("error", e.message); }
 }
@@ -42,8 +43,8 @@ function commitNow() {
 }
 const schedule = () => { clearTimeout(commitT); commitT = setTimeout(commitNow, 600); };
 function restore(c) { markDirty(); renderEditor(); renderOutline(); renderStatus(); }
-function undo() { if (!canEdit) return; commitNow(); const c = cur(), x = hist(c); if (x.u.length < 2) return; x.r.push(x.u.pop()); c.blocks = JSON.parse(x.u.at(-1)); restore(c); }
-function redo() { if (!canEdit) return; commitNow(); const c = cur(), x = hist(c); if (!x.r.length) return; const j = x.r.pop(); x.u.push(j); c.blocks = JSON.parse(j); restore(c); }
+function undo() { if (!canEdit || !cur()) return; commitNow(); const c = cur(), x = hist(c); if (x.u.length < 2) return; x.r.push(x.u.pop()); c.blocks = JSON.parse(x.u.at(-1)); restore(c); }
+function redo() { if (!canEdit || !cur()) return; commitNow(); const c = cur(), x = hist(c); if (!x.r.length) return; const j = x.r.pop(); x.u.push(j); c.blocks = JSON.parse(j); restore(c); }
 function mutate(fn) {
   commitNow(); if (fn(cur().blocks) === false) return;
   commitNow(); markDirty(); renderEditor(); renderOutline(); renderStatus();
@@ -75,7 +76,7 @@ function removeBlock(i) {
   mutate((bl) => { const prev = bl[i - 1] || bl[i + 1]; bl.splice(i, 1); if (!bl.length) bl.push(block()); toFocus = prev?.id || bl[0].id; });
 }
 function toggleLevel(i) { mutate((bl) => { bl[i].type = bl[i].type === "h1" ? "h2" : "h1"; toFocus = bl[i].id; }); }
-function align(v) { if (!canEdit) return; mutate((bl) => { const b = bl.find((x) => x.id === focusId); if (!b) return false; b.align = v; toFocus = b.id; }); }
+function align(v) { if (!canEdit || !cur()) return; mutate((bl) => { const b = bl.find((x) => x.id === focusId); if (!b) return false; b.align = v; toFocus = b.id; }); }
 
 // ---------- Rendering ----------
 function nums(c) {
@@ -124,7 +125,10 @@ function blockEl(b, i, num) {
   wrap.append(ed); return wrap;
 }
 function renderEditor() {
-  const c = cur(), D = $("#doc"); D.replaceChildren(); if (!c) return;
+  const D = $("#doc"), special = curId.startsWith("__");
+  $("#sheet").classList.toggle("bare", special); applyFormat();
+  if (special) { renderSpecial(curId, ctx(), D); return; }
+  const c = cur(); D.replaceChildren(); if (!c) return;
   const label = { main: `Chapter ${mains().findIndex((x) => x.id === c.id) + 1}`, front: "Front matter", back: "Back matter" }[c.kind];
   const title = h("input", { value: c.title, "aria-label": "Chapter title", readonly: c.kind !== "main" || !canEdit });
   title.oninput = () => { c.title = title.value; markDirty(c.id); renderTree(); renderStatus(); };
@@ -150,7 +154,7 @@ function renderTree() {
     if (open) items.forEach((i) => T.append(i));
   };
   const get = (id) => chs.find((c) => c.id === id);
-  group("front", "Front matter", [auto("Title Page"), auto("Approval Sheet"), item(get("acknowledgement"), "Acknowledgement"), item(get("abstract"), "Abstract"), auto("Table of Contents"), auto("List of Tables"), auto("List of Figures")]);
+  group("front", "Front matter", [item({ id: "__title" }, "Title Page"), item({ id: "__approval" }, "Approval Sheet"), item(get("acknowledgement"), "Acknowledgement"), item(get("abstract"), "Abstract"), item({ id: "__toc" }, "Table of Contents"), auto("List of Tables"), auto("List of Figures")]);
   group("main", "Main matter", mains().map((c, i) => item(c, `Chapter ${i + 1}: ${c.title}`, canEdit ? [
     ia("↑", "Move up", () => moveCh(c, -1)), ia("↓", "Move down", () => moveCh(c, 1)), ia("✎", "Rename", () => renameCh(c)), ia("✕", "Delete chapter", () => deleteCh(c))] : [])));
   group("back", "Back matter", [auto("Bibliography"), item(get("appendices"), "Appendices")]);
@@ -175,6 +179,7 @@ function renderStatus() {
   $("#st-words").textContent = `${words.toLocaleString()} words`;
   $("#st-pages").textContent = `About ${Math.max(1, Math.ceil(words / 275))} pages double-spaced`;
   const c = cur(); $("#st-chap").textContent = c ? `Now editing: ${c.kind === "main" ? `Chapter ${mains().findIndex((x) => x.id === c.id) + 1}: ` : ""}${c.title}` : "";
+  if (curId?.startsWith("__")) $("#st-chap").textContent = "Now editing: " + { __title: "Title Page", __approval: "Approval Sheet", __toc: "Table of Contents" }[curId];
 }
 const renderAll = () => { renderTree(); renderEditor(); renderOutline(); renderStatus(); };
 function open(id) { commitNow(); curId = id; focusId = null; document.body.classList.remove("show-left"); renderAll(); $(".center").scrollTop = 0; }
@@ -206,6 +211,33 @@ async function deleteCh(c) {
   chs = chs.filter((x) => x.id !== c.id); dirty.delete(c.id); delete H[c.id];
   if (curId === c.id) curId = (mains()[0] || chs[0]).id; renderAll();
 }
+
+// ---------- Template settings ----------
+const ctx = () => ({ project, canEdit, h, text, chs: () => chs, mains, nums, dirty: () => { markDirty("__meta"); $("#ptitle").textContent = project.title; renderStatus(); } });
+function applyFormat() {
+  const f = project.format, st = $(".center").style, a4 = f.paper === "a4";
+  Object.entries({ "--ff": `"${f.fontFamily}"`, "--fs": f.fontSize + "pt", "--lh": f.lineSpacing, "--ind": f.indent + "in", "--al": f.align, "--mg": f.margin + "in", "--cs": f.chapterSize + "pt", "--pw": a4 ? "8.27in" : "8.5in", "--ph": a4 ? "11.69in" : "11in" })
+    .forEach(([k, v]) => st.setProperty(k, v));
+  $("#sheet").classList.toggle("single", curId === "abstract");
+}
+const FMT = [["fontFamily", "Font", "select", ["Times New Roman", "Arial", "Georgia"]], ["fontSize", "Body font size (pt)", "number", [10, 14, 0.5]],
+  ["paper", "Paper size", "select", [["letter", "US Letter"], ["a4", "A4"]]], ["margin", "Margins (inches, all sides)", "number", [0.5, 2, 0.25]],
+  ["lineSpacing", "Line spacing", "select", [["1", "Single"], ["1.5", "1.5 lines"], ["2", "Double"]]], ["indent", "Paragraph indent (inches)", "number", [0, 1, 0.25]],
+  ["align", "Alignment", "select", [["justify", "Justified"], ["left", "Left"]]], ["chapterSize", "Chapter heading size (pt)", "number", [12, 18, 1]]];
+function openFormat() {
+  const B = $("#fmt-body"); B.replaceChildren();
+  FMT.forEach(([k, label, type, o]) => {
+    const f = project.format; let i;
+    if (type === "select") { i = h("select", {}, ...o.map((x) => { const [v, t] = Array.isArray(x) ? x : [x, x]; return h("option", { value: v }, t); })); }
+    else i = h("input", { type: "number", min: o[0], max: o[1], step: o[2] });
+    i.value = f[k]; i.disabled = !canEdit;
+    i.onchange = () => { const n = typeof DEFAULT_FORMAT[k] === "number"; const v = n ? parseFloat(i.value) : i.value; if (n && !(v >= (o[0] ?? 0))) { i.value = f[k]; return; } f[k] = v; markDirty("__meta"); applyFormat(); };
+    B.append(h("label", {}, label, i));
+  });
+  $("#fmt-restore").hidden = !canEdit; if (!$("#fmt-dlg").open) $("#fmt-dlg").showModal();
+}
+$("#fmt-btn").onclick = openFormat;
+$("#fmt-restore").onclick = () => { project.format = { ...DEFAULT_FORMAT }; markDirty("__meta"); applyFormat(); openFormat(); };
 
 // ---------- Toolbar, shortcuts, init ----------
 document.querySelectorAll("[data-cmd]").forEach((b) => {
@@ -250,7 +282,7 @@ watchAuth(async (u) => {
     $("#ptitle").textContent = project.title; document.title = project.title + " — ririrish";
     canEdit = project.ownerId === u.uid;
     $("#roban").hidden = canEdit; $(".toolbar").classList.toggle("ro", !canEdit);
-    chs = await loadChapters(pid); curId = (mains()[0] || chs[0]).id;
+    ensureDefaults(project); chs = await loadChapters(pid); curId = (mains()[0] || chs[0]).id;
     setState("saved"); renderAll();
   } catch (e) { console.error(e); $("#ptitle").textContent = "Could not open this project"; toast(e.message); }
 });
