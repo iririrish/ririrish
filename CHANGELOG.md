@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1] - Free-plan revision
+### Changed
+- Removed Firebase Storage (requires a paid plan). Deleted `storage.rules` and the Storage import in `js/firebase-config.js`.
+- Phase 4 images will be compressed in the browser and stored as small Firestore documents instead.
+### Fixed
+- Split Firestore `update` and `delete` rules so project deletion is not blocked by a null `request.resource`.
+
 ## [0.1.0] - Phase 1: Foundation and Setup
 ### Added
 - Project structure, single Firebase initialization (`js/firebase-config.js`).
