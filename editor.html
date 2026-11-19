@@ -1,5 +1,43 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Editor — ririrish</title><link rel="stylesheet" href="css/styles.css"></head>
-<body><main class="stub glass"><a href="index.html" class="back">Back to projects</a>
-<h1 id="t">Loading…</h1><p class="meta">The three-panel editor arrives in Phase 2. Your project is saved and will open here.</p></main>
-<script type="module" src="js/editor-stub.js"></script></body></html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Editor — ririrish</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css"><link rel="stylesheet" href="css/editor.css">
+</head>
+<body class="ed-body">
+<header class="topbar glass">
+  <button class="btn only-small" id="toggle-left" aria-label="Show structure">Structure</button>
+  <a class="logo sm" href="index.html" title="Back to projects">ririrish</a>
+  <span class="sep">/</span><strong id="ptitle" class="ptitle">Loading…</strong>
+  <span class="grow"></span><span id="save" class="save" role="status"></span>
+</header>
+<div id="roban" class="banner" hidden>Read-only: only the project owner can edit in this version. Editor access arrives with sharing in Phase 7.</div>
+<div class="toolbar glass" role="toolbar" aria-label="Formatting">
+  <button data-cmd="undo" title="Undo (Ctrl+Z)">Undo</button><button data-cmd="redo" title="Redo (Ctrl+Y)">Redo</button><i></i>
+  <button data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button><button data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button><button data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button><i></i>
+  <select id="list-style" aria-label="Insert list or change list style"><option value="">List…</option></select><i></i>
+  <button data-cmd="align-left" title="Align left">Left</button><button data-cmd="align-center" title="Center">Center</button><button data-cmd="align-right" title="Align right">Right</button><button data-cmd="align-justify" title="Justify">Justify</button><i></i>
+  <button disabled title="Coming in Phase 4">Image <small>soon</small></button><button disabled title="Coming in Phase 4">Table <small>soon</small></button>
+  <button disabled title="Coming soon">Citation <small>soon</small></button><button disabled title="Coming soon">Equation <small>soon</small></button>
+</div>
+<div class="panels">
+  <aside class="left" id="left" aria-label="Thesis structure">
+    <div class="ph">Thesis structure</div><nav id="tree"></nav>
+    <button class="btn addch" id="add-ch">Add chapter</button>
+    <div class="ph">File outline</div><nav id="outline"></nav>
+  </aside>
+  <main class="center"><div class="sheet" id="sheet"><div id="doc"></div></div></main>
+  <aside class="right" aria-label="Live preview">
+    <div class="ph">Live preview</div>
+    <p class="meta pad">The paginated manuscript preview and PDF export arrive in Phase 5. Until then, the editor shows structure and numbering only.</p>
+  </aside>
+</div>
+<footer class="status"><span id="st-words"></span><span id="st-pages"></span><span id="st-chap"></span></footer>
+<dialog id="ask-dlg" class="glass"><form method="dialog"><h2 id="ask-title"></h2><label>Name<input id="ask-input" maxlength="200"></label>
+  <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save</button></div></form></dialog>
+<dialog id="conf-dlg" class="glass"><form method="dialog"><h2>Delete chapter?</h2><p id="conf-text"></p>
+  <div class="actions"><button class="btn" value="cancel">Keep chapter</button><button class="btn danger-fill" value="ok">Delete chapter</button></div></form></dialog>
+<div id="toast" class="toast" role="status"></div>
+<script type="module" src="js/editor.js"></script>
+</body></html>

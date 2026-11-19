@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0] - Phase 2: Thesis Editor
+### Added
+- Three-panel editor (`editor.html`, `js/editor.js`, `js/doc-model.js`, `css/editor.css`).
+- Structure tree with collapsible groups; add, rename, reorder and delete chapters; current section highlighted.
+- Writing blocks: paragraph, section, subsection, list (six styles); add, reorder, delete, convert section and subsection.
+- File outline with click-to-jump; automatic heading numbers.
+- Toolbar (undo, redo, bold, italic, underline, list style, alignment) and shortcuts (Ctrl+B/I/U/Z/Y/S).
+- Debounced Firestore autosave per chapter, save status, word count, estimated pages, current chapter.
+- Firestore `chapters` subcollection and matching security rules.
+### Changed
+- Duplicating a project now copies its chapters; deleting a project now deletes its chapters.
+- Removed `js/editor-stub.js`.
+### Notes
+- Image, table, citation and equation buttons are disabled and labelled "soon". Preview is a placeholder until Phase 5.
+- You must republish `firestore.rules`.
+
 ## [0.1.1] - Free-plan revision
 ### Changed
 - Removed Firebase Storage (requires a paid plan). Deleted `storage.rules` and the Storage import in `js/firebase-config.js`.
