@@ -2,6 +2,7 @@
 --glass:rgba(255,255,255,.72);--solid:#fff;--danger:#b3261e;--r:10px}
 @media(prefers-color-scheme:dark){:root{--bg:#101713;--ink:#e8f0eb;--muted:#9bada3;--green:#3fae78;--green-d:#2f9361;--line:rgba(232,240,235,.16);--glass:rgba(28,40,33,.72);--solid:#1b2620;--danger:#f2877f}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{font:400 15px/1.5 "Instrument Sans",system-ui,sans-serif;color:var(--ink);min-height:100vh;
 background:var(--bg) radial-gradient(60rem 30rem at 85% -10%,rgba(31,122,77,.13),transparent 60%)}
