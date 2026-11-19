@@ -56,3 +56,11 @@ dialog h2{font-size:1.4rem;margin-bottom:1rem}.actions{display:flex;justify-cont
 @media(max-width:760px){.auth{grid-template-columns:1fr;gap:2rem}.auth-intro h1{font-size:2rem}
 .row{grid-template-columns:1fr auto;row-gap:.3rem}.row .tpl,.row .mod{display:none}.row .pill{grid-column:1}.tools{flex-direction:column}.tools select{width:100%}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* Thin, quiet scrollbars */
+*{scrollbar-width:thin;scrollbar-color:rgba(128,138,132,.5) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(128,138,132,.45);border-radius:10px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(128,138,132,.8);background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}
