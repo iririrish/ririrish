@@ -35,7 +35,12 @@ export function text(html) {
   return t.content.textContent || "";
 }
 
-const MAIN_TITLES = ["The Problem and Its Background", "Review of Related Literature", "Methodology", "Results and Discussion", "Summary, Conclusions and Recommendations"];
+const MAIN_TITLES = ["The Problem and Its Background", "Literature Review", "Design Methodology", "Data Results and Analysis", "Summary of Findings, Conclusions and Recommendations"];
+// Starter sections for NEW projects, following the official capstone template.
+const SECTIONS = [["Background of the Study", "Project Objectives", "Scope and Delimitation of the Study", "Importance of the Study", "Definition of Terms"],
+  ["Conceptual Literature", "Related Literature", "Synthesis"], ["Conceptual Framework", "Design Procedure and Tools Requirement"], [], ["Summary of Findings", "Conclusion", "Recommendations"]];
+const seedBlocks = (c) => c.kind === "main" ? [block(), ...SECTIONS[c.order].flatMap((t) => [block("h1", t), block()])]
+  : c.id === "abstract" ? [block(), block("kw")] : [block()];
 const pack = (c) => ({ kind: c.kind, title: c.title, order: c.order, blocks: JSON.parse(JSON.stringify(c.blocks)), updatedAt: serverTimestamp() });
 
 export async function loadChapters(pid) {
@@ -43,11 +48,11 @@ export async function loadChapters(pid) {
   const snap = await getDocs(col);
   if (snap.empty) {
     const list = [
-      { id: "acknowledgement", kind: "front", title: "Acknowledgement", order: 0 },
-      { id: "abstract", kind: "front", title: "Abstract", order: 1 },
-      { id: "appendices", kind: "back", title: "Appendices", order: 0 },
+      { id: "abstract", kind: "front", title: "Abstract", order: 0 },
+      { id: "acknowledgement", kind: "front", title: "Acknowledgement", order: 1 },
+      { id: "appendices", kind: "back", title: "Appendix", order: 0 },
       ...MAIN_TITLES.map((title, i) => ({ id: "c_" + uid(), kind: "main", title, order: i }))
-    ].map((c) => ({ ...c, blocks: [block()] }));
+    ].map((c) => ({ ...c, blocks: seedBlocks(c) }));
     const b = writeBatch(db); list.forEach((c) => b.set(doc(col, c.id), pack(c))); await b.commit();
     return list;
   }
@@ -67,11 +72,13 @@ export const DEFAULT_FORMAT = { template: "batstateu-capstone", fontFamily: "Tim
 export const DEFAULT_META = {
   degree: "Bachelor of Science in Instrumentation and Control Engineering",
   program: "Expanded Tertiary Education Equivalency and Accreditation Program",
-  specialization: "", university: "Batangas State University", campus: "", college: "", department: "", academicYear: "", submissionDate: "",
-  introStatement: "A Capstone Study Presented to the Faculty of the {college}",
+  specialization: "", university: "Batangas State University - The National Engineering University", campus: "Alangilan, Batangas City", college: "College of Engineering", department: "", academicYear: "", submissionDate: "",
+  introStatement: "A Capstone Design Study\nPresented to the Faculty of\n{college}\n{university}\n{campus}",
   degreeStatement: "In partial fulfillment of the requirements for the degree of\n{degree}\n{program}",
   approvalStatement: "This capstone study entitled “{title}” prepared and submitted by {authors} in partial fulfillment of the requirements for the degree {degree} - {program} has been examined and hereby accepted.",
-  certification: ""
+  certification: "",
+  gradeStatement: "Approved by the committee of oral examination with a grade of ______________.",
+  acceptanceStatement: "Accepted and approved in partial fulfillment of the requirements for the degree of\nBachelor of Science Program."
 };
 export const authorStr = (a) => [a.last && (a.first ? a.last + "," : a.last), a.first, a.mi].filter(Boolean).join(" ");
 function parseAuthor(s) {
@@ -86,7 +93,7 @@ export function ensureDefaults(P) {
   if (!m.authorList) m.authorList = (P.authors || []).map(parseAuthor);
   if (!m.authorList.length) m.authorList = [{ id: uid(), last: "", first: "", mi: "" }];
   m.authorList.forEach((a) => (a.id ||= uid()));
-  if (!m.signatories) m.signatories = ["Adviser", "Panel Member", "Chairperson", "Dean"].map((role) => ({ id: uid(), name: "", position: "", role, label: "" }));
+  if (!m.signatories) m.signatories = [["Adviser", "Engr.", ""], ["Chairperson", "Engr.", "Chairman"], ["Panel Member", "Engr.", "Member"], ["Panel Member", "Engr.", "Member"], ["Dean", "Dr.", "Dean, College of Engineering"]].map(([role, position, label]) => ({ id: uid(), name: "", position, role, label }));
   return P;
 }
 export const saveMeta = (pid, P) => updateDoc(doc(db, "projects", pid), {
