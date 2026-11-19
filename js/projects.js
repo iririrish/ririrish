@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc, getDoc, query, where,
+  collection, doc, addDoc, updateDoc, getDoc, getDocs, writeBatch, query, where,
   onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -15,11 +15,25 @@ const base = (user, title, authors, template) => ({
 });
 export const createProject = (user, { title, author, template }) =>
   addDoc(col, base(user, title, author.trim() ? [author.trim()] : [], template));
-export const duplicateProject = (user, p) =>
-  addDoc(col, base(user, `${p.title} (copy)`, p.authors || [], p.template));
+export async function duplicateProject(user, p) {
+  const ref = await addDoc(col, base(user, `${p.title} (copy)`, p.authors || [], p.template));
+  const snap = await getDocs(collection(db, "projects", p.id, "chapters"));
+  if (!snap.empty) {
+    const b = writeBatch(db);
+    snap.forEach((d) => b.set(doc(db, "projects", ref.id, "chapters", d.id), d.data()));
+    await b.commit();
+  }
+  return ref;
+}
 export const renameProject = (id, title) =>
   updateDoc(doc(db, "projects", id), { title: title.trim(), updatedAt: serverTimestamp() });
-export const deleteProject = (id) => deleteDoc(doc(db, "projects", id));
+export async function deleteProject(id) {
+  const snap = await getDocs(collection(db, "projects", id, "chapters"));
+  const b = writeBatch(db);
+  snap.forEach((d) => b.delete(d.ref));
+  b.delete(doc(db, "projects", id));
+  await b.commit();
+}
 export async function getProject(id) {
   const s = await getDoc(doc(db, "projects", id));
   return s.exists() ? { id: s.id, ...s.data() } : null;
