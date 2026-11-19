@@ -13,7 +13,7 @@ export function renderSpecial(id, ctx, D) {
   const { project: P, canEdit, h } = ctx, m = P.meta;
   D.replaceChildren();
   const box = h("div", { class: "pagebox" });
-  const refresh = () => box.replaceChildren(id === "__title" ? titlePage() : id === "__approval" ? approvalPage() : tocPage());
+  const refresh = () => box.replaceChildren(id === "__title" ? titlePage() : id === "__approval" ? approvalPage() : id === "__toc" ? tocPage() : listPage(id === "__lot" ? "table" : "figure"));
   const again = () => { ctx.dirty(); renderSpecial(id, ctx, D); };
   const bind = (label, obj, key, { area, onSet } = {}) => {
     const i = h(area ? "textarea" : "input", area ? { rows: 3 } : {}); i.value = obj[key] || ""; i.disabled = !canEdit;
@@ -59,7 +59,8 @@ export function renderSpecial(id, ctx, D) {
     authorsUI(), bind("Introductory statement", m, "introStatement", { area: true }), bind("Degree statement", m, "degreeStatement", { area: true }), note);
   else if (id === "__approval") form = h("div", { class: "fcard" }, h("h2", {}, "Approval sheet"),
     bind("Approval statement", m, "approvalStatement", { area: true }), bind("Panel grade statement", m, "gradeStatement", { area: true }), bind("Acceptance statement (above the date and dean)", m, "acceptanceStatement", { area: true }), bind("Other statement (optional)", m, "certification", { area: true }), sigUI(), note);
-  else form = h("div", { class: "fcard" }, h("h2", {}, "Table of contents"), h("p", { class: "meta" }, "Built automatically from your chapters, sections and subsections. Page numbers are added when the PDF is generated (Phase 5)."));
+  else form = h("div", { class: "fcard" }, h("h2", {}, { __toc: "Table of contents", __lot: "List of tables", __lof: "List of figures" }[id]),
+    h("p", { class: "meta" }, (id === "__toc" ? "Built automatically from your chapters and sections." : `Built automatically from the captions of your ${id === "__lot" ? "tables" : "figures"}.`) + " Page numbers are added when the PDF is generated (Phase 5)."));
   D.append(form, box); refresh();
 
   function titlePage() {
@@ -81,6 +82,10 @@ export function renderSpecial(id, ctx, D) {
       ...ch.map((s) => h("div", { class: "ctr" }, sig(s))), mem.length ? h("div", { class: "mem" }, ...mem.map(sig)) : "", oth.length ? h("div", { class: "mem" }, ...oth.map(sig)) : "",
       m.acceptanceStatement.trim() ? h("p", { class: "st" }, ...lines(fill(m.acceptanceStatement, P))) : "",
       h("div", { class: "foot2" }, h("div", { class: "dt" }, h("b", {}, m.submissionDate || "Month YYYY"), h("div", {}, "Date")), h("div", {}, ...dean.map(sig))));
+  }
+  function listPage(kind) {
+    const rows = ctx.media(kind).map((it) => h("div", { class: "toc lx" }, h("span", {}, `${kind === "table" ? "Table" : "Figure"} ${it.num}. ${it.caption || "(no caption)"}`), h("i", { class: "ld" }), h("span", { class: "pg" }, "")));
+    return h("div", { class: "page" }, h("div", { class: "aph" }, kind === "table" ? "List of Tables" : "List of Figures"), ...(rows.length ? rows : [h("p", { class: "meta" }, `No ${kind}s yet.`)]));
   }
   function tocPage() {
     const rows = [], add = (t, l) => rows.push(h("div", { class: "toc l" + l }, h("span", {}, t), h("i", { class: "ld" }), h("span", { class: "pg" }, "")));

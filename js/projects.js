@@ -1,4 +1,6 @@
 import { db } from "./firebase-config.js";
+import { uid } from "./doc-model.js";
+import { copyImage, removeFiles } from "./images.js";
 import {
   collection, doc, addDoc, updateDoc, getDoc, getDocs, writeBatch, query, where,
   onSnapshot, serverTimestamp
@@ -16,23 +18,29 @@ const base = (user, title, authors, template) => ({
 export const createProject = (user, { title, author, template }) =>
   addDoc(col, base(user, title, author.trim() ? [author.trim()] : [], template));
 export async function duplicateProject(user, p) {
-  const ref = await addDoc(col, base(user, `${p.title} (copy)`, p.authors || [], p.template));
-  const snap = await getDocs(collection(db, "projects", p.id, "chapters"));
-  if (!snap.empty) {
-    const b = writeBatch(db);
-    snap.forEach((d) => b.set(doc(db, "projects", ref.id, "chapters", d.id), d.data()));
-    await b.commit();
+  const ref = await addDoc(col, { ...base(user, `${p.title} (copy)`, p.authors || [], p.template), ...(p.meta ? { meta: p.meta } : {}), ...(p.format ? { format: p.format } : {}) });
+  const [cs, ims] = await Promise.all([getDocs(collection(db, "projects", p.id, "chapters")), getDocs(collection(db, "projects", p.id, "images"))]);
+  const map = {}, b = writeBatch(db);
+  for (const d of ims.docs) { // copy the files so each project owns its images
+    const r = d.data(), nid = uid() + uid(), path = `images/${user.uid}/${ref.id}/${nid}.webp`;
+    try {
+      const url = await copyImage(r.storagePath, path); map[d.id] = { id: nid, url, path };
+      b.set(doc(db, "projects", ref.id, "images", nid), { ...r, ownerId: user.uid, storagePath: path, imageUrl: url, fileName: `${nid}.webp`, uploadedAt: serverTimestamp() });
+    } catch (e) { console.error("Image copy failed", e); }
   }
-  return ref;
+  cs.forEach((d) => {
+    const v = d.data();
+    v.blocks = (v.blocks || []).map((x) => { if (!x.imageId) return x; const m = map[x.imageId]; return m ? { ...x, imageId: m.id, url: m.url, path: m.path } : { ...x, imageId: null, url: "", path: "" }; });
+    b.set(doc(db, "projects", ref.id, "chapters", d.id), v);
+  });
+  await b.commit(); return ref;
 }
 export const renameProject = (id, title) =>
   updateDoc(doc(db, "projects", id), { title: title.trim(), updatedAt: serverTimestamp() });
 export async function deleteProject(id) {
-  const snap = await getDocs(collection(db, "projects", id, "chapters"));
-  const b = writeBatch(db);
-  snap.forEach((d) => b.delete(d.ref));
-  b.delete(doc(db, "projects", id));
-  await b.commit();
+  const [cs, ims] = await Promise.all([getDocs(collection(db, "projects", id, "chapters")), getDocs(collection(db, "projects", id, "images"))]);
+  await removeFiles(ims.docs.map((d) => d.data().storagePath)).catch(console.error);
+  const b = writeBatch(db); cs.forEach((d) => b.delete(d.ref)); ims.forEach((d) => b.delete(d.ref)); b.delete(doc(db, "projects", id)); await b.commit();
 }
 export async function getProject(id) {
   const s = await getDoc(doc(db, "projects", id));

@@ -2,6 +2,9 @@ import { watchAuth } from "./auth.js";
 import { getProject } from "./projects.js";
 import { block, clean, text, LIST_CSS, LIST_LABELS, loadChapters, saveChapter, removeChapter, ensureDefaults, saveMeta, DEFAULT_FORMAT } from "./doc-model.js";
 import { renderSpecial } from "./frontmatter.js";
+import { figBody, tblBody, newTable } from "./blocks-media.js";
+import { prepareImage, uploadImage, deleteImage, updateCaption } from "./images.js";
+import { storageReady } from "./supabase-config.js";
 
 const $ = (s) => document.querySelector(s);
 const pid = new URLSearchParams(location.search).get("id");
@@ -19,7 +22,8 @@ let saveT, commitT, statusT;
 const cur = () => chs.find((c) => c.id === curId);
 const mains = () => chs.filter((c) => c.kind === "main").sort((a, b) => a.order - b.order);
 const lvl = (b) => (b.type === "h1" ? 1 : b.type === "h2" ? 2 : b.type === "h3" ? 3 : 9);
-const toast = (m) => { const t = $("#toast"); t.textContent = m; t.className = "toast show err"; setTimeout(() => (t.className = "toast"), 4000); };
+let me, mm = new Map(), replaceTarget = null;
+const toast = (m, ok) => { const t = $("#toast"); t.textContent = m; t.className = "toast show" + (ok ? "" : " err"); setTimeout(() => (t.className = "toast"), 4000); };
 
 // ---------- Save + undo ----------
 function setState(s, msg) {
@@ -100,7 +104,12 @@ function blockEl(b, i, num) {
     h("button", { title: "Move up", "aria-label": "Move up", onclick: () => moveBlock(i, -1) }, "↑"),
     h("button", { title: "Move down", "aria-label": "Move down", onclick: () => moveBlock(i, 1) }, "↓"));
   if (lvl(b) < 9) ctl.append(h("button", { title: "Promote (section ← subsection)", onclick: () => shiftLevel(i, -1) }, "←"), h("button", { title: "Demote (section → subsection)", onclick: () => shiftLevel(i, 1) }, "→"));
-  ctl.append(h("button", { title: "Delete", "aria-label": "Delete block", onclick: () => removeBlock(i) }, "✕"));
+  ctl.append(h("button", { title: "Delete", "aria-label": "Delete block", onclick: () => (b.type === "fig" && b.imageId ? delFigure(b) : removeBlock(i)) }, "✕"));
+  if (b.type === "fig" || b.type === "tbl") {
+    if (canEdit) wrap.append(ctl);
+    const k = mm.get(b.id)?.num || 1;
+    wrap.append(b.type === "fig" ? figBody(b, M(), k) : tblBody(b, M(), k)); return wrap;
+  }
   let ed;
   if (b.type === "list") { ed = h(b.listStyle === "bullet" ? "ul" : "ol", { class: "ed list" }); ed.style.listStyleType = LIST_CSS[b.listStyle || "bullet"]; ed.innerHTML = b.html || "<li><br></li>"; }
   else { ed = h("div", { class: "ed", "data-ph": "" }); ed.innerHTML = b.html; }
@@ -117,7 +126,15 @@ function blockEl(b, i, num) {
     ed.onpaste = (e) => { e.preventDefault(); document.execCommand("insertText", false, (e.clipboardData.getData("text/plain") || "").replace(/\s*\n+\s*/g, " ")); };
     ed.onkeydown = (e) => {
       const bl = cur().blocks, idx = bl.findIndex((x) => x.id === b.id);
-      if (e.key === "Enter" && !e.shiftKey && b.type !== "list" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); insertAfter(idx, block()); }
+      if (e.key === "Enter" && !e.shiftKey && b.type !== "list" && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const sc = b.type === "p" && /^\[\[(figure|table):\s*(.*?)\s*\]\]$/i.exec(text(b.html).trim());
+        if (!sc) { insertAfter(idx, block()); return; }
+        mutate((bl) => {
+          const nb = sc[1].toLowerCase() === "figure" ? block("fig", "", { lock: true, align: "center", caption: sc[2], w: 4, h: 3, nw: 4, nh: 3 }) : block("tbl", "", { ...newTable(3, 3), caption: sc[2], label: "" });
+          bl.splice(idx, 1, nb); if (!bl[idx + 1]) bl.push(block()); toFocus = bl[idx + 1].id;
+        });
+      }
       else if (e.key === "Backspace" && ed.textContent === "" && bl.length > 1) { e.preventDefault(); removeBlock(idx); }
     };
     wrap.append(ctl);
@@ -131,6 +148,7 @@ function renderEditor() {
   $("#sheet").classList.toggle("bare", special); applyFormat();
   if (special) { renderSpecial(curId, ctx(), D); return; }
   const c = cur(); D.replaceChildren(); if (!c) return;
+  mm = mediaMap();
   const chNo = mains().findIndex((x) => x.id === c.id) + 1;
   const title = h("textarea", { rows: 1, "aria-label": "Chapter title", readonly: c.kind !== "main" || !canEdit });
   title.value = c.title;
@@ -160,7 +178,7 @@ function renderTree() {
     if (open) items.forEach((i) => T.append(i));
   };
   const get = (id) => chs.find((c) => c.id === id);
-  group("front", "Front matter", [item({ id: "__title" }, "Title Page"), item({ id: "__approval" }, "Approval Sheet"), item(get("abstract"), "Abstract"), item(get("acknowledgement"), "Acknowledgement"), item({ id: "__toc" }, "Table of Contents"), auto("List of Tables"), auto("List of Figures")]);
+  group("front", "Front matter", [item({ id: "__title" }, "Title Page"), item({ id: "__approval" }, "Approval Sheet"), item(get("abstract"), "Abstract"), item(get("acknowledgement"), "Acknowledgement"), item({ id: "__toc" }, "Table of Contents"), item({ id: "__lot" }, "List of Tables"), item({ id: "__lof" }, "List of Figures")]);
   group("main", "Main matter", mains().map((c, i) => item(c, `Chapter ${i + 1}: ${c.title}`, canEdit ? [
     ia("↑", "Move up", () => moveCh(c, -1)), ia("↓", "Move down", () => moveCh(c, 1)), ia("✎", "Rename", () => renameCh(c)), ia("✕", "Delete chapter", () => deleteCh(c))] : [])));
   group("back", "Back matter", [auto("Bibliography"), item(get("appendices"), "Appendices")]);
@@ -190,7 +208,7 @@ function renderStatus() {
     const k = c.blocks.filter((b) => b.type === "kw").reduce((n, b) => n + text(b.html).split(/[,;]/).filter((x) => x.trim()).length, 0);
     $("#st-chap").textContent += ` · Abstract: ${w} words (200–250), ${k} keywords (min 5)`;
   }
-  if (curId?.startsWith("__")) $("#st-chap").textContent = "Now editing: " + { __title: "Title Page", __approval: "Approval Sheet", __toc: "Table of Contents" }[curId];
+  if (curId?.startsWith("__")) $("#st-chap").textContent = "Now editing: " + { __title: "Title Page", __approval: "Approval Sheet", __toc: "Table of Contents", __lot: "List of Tables", __lof: "List of Figures" }[curId];
 }
 const renderAll = () => { renderTree(); renderEditor(); renderOutline(); renderStatus(); };
 function open(id) { commitNow(); curId = id; focusId = null; document.body.classList.remove("show-left"); renderAll(); $(".center").scrollTop = 0; }
@@ -203,8 +221,8 @@ function ask(title, val) {
     d.showModal(); i.select();
   });
 }
-function confirmDel(msg) {
-  return new Promise((res) => { const d = $("#conf-dlg"); $("#conf-text").textContent = msg; d.returnValue = ""; d.onclose = () => res(d.returnValue === "ok"); d.showModal(); });
+function confirmDel(msg, title = "Delete chapter?", ok = "Delete chapter", keep = "Keep chapter") {
+  return new Promise((res) => { const d = $("#conf-dlg"); $("#conf-text").textContent = msg; $("#conf-title").textContent = title; $("#conf-ok").textContent = ok; $("#conf-keep").textContent = keep; d.returnValue = ""; d.onclose = () => res(d.returnValue === "ok"); d.showModal(); });
 }
 async function addChapter() {
   const t = await ask("New chapter title", "Untitled chapter"); if (!t) return;
@@ -224,7 +242,7 @@ async function deleteCh(c) {
 }
 
 // ---------- Template settings ----------
-const ctx = () => ({ project, canEdit, h, text, chs: () => chs, mains, nums, dirty: () => { markDirty("__meta"); $("#ptitle").textContent = project.title; renderStatus(); } });
+const ctx = () => ({ project, canEdit, h, text, media: mediaList, chs: () => chs, mains, nums, dirty: () => { markDirty("__meta"); $("#ptitle").textContent = project.title; renderStatus(); } });
 function applyFormat() {
   const f = project.format, st = $(".center").style, a4 = f.paper === "a4";
   Object.entries({ "--ff": `"${f.fontFamily}"`, "--fs": f.fontSize + "pt", "--lh": f.lineSpacing, "--ind": f.indent + "in", "--al": f.align, "--mg": f.margin + "in", "--cs": f.chapterSize + "pt", "--pw": a4 ? "8.27in" : "8.5in", "--ph": a4 ? "11.69in" : "11in" })
@@ -249,6 +267,73 @@ function openFormat() {
 }
 $("#fmt-btn").onclick = openFormat;
 $("#fmt-restore").onclick = () => { project.format = { ...DEFAULT_FORMAT }; markDirty("__meta"); applyFormat(); openFormat(); };
+
+// ---------- Images and tables ----------
+const M = () => ({ h, canEdit, project, maxW: () => (project.format.paper === "a4" ? 8.27 : 8.5) - 2 * project.format.margin,
+  touch: (s) => { if (s) commitNow(); else schedule(); markDirty(); }, toast, pick: (b) => pickImage(b), delFig: (b) => delFigure(b),
+  removeBlock: (b) => { const i = cur().blocks.findIndex((x) => x.id === b.id); if (i >= 0) removeBlock(i); },
+  syncCaption: (b) => b.imageId && updateCaption(pid, b.imageId, b.caption) });
+const docOrder = () => [...chs.filter((c) => c.kind === "front").sort((a, b) => a.order - b.order), ...mains(), ...chs.filter((c) => c.kind === "back").sort((a, b) => a.order - b.order)];
+function mediaMap() {
+  const m = new Map(); let f = 0, t = 0;
+  for (const c of docOrder()) for (const b of c.blocks) {
+    if (b.type === "fig") m.set(b.id, { kind: "figure", num: ++f, caption: b.caption }); else if (b.type === "tbl") m.set(b.id, { kind: "table", num: ++t, caption: b.caption });
+  }
+  return m;
+}
+const mediaList = (kind) => [...mediaMap().values()].filter((x) => x.kind === kind);
+async function delFigure(b) {
+  if (!(await confirmDel("This image will be permanently deleted from storage and cannot be undone.", "Delete image?", "Delete image", "Keep image"))) return;
+  try { await deleteImage(pid, b.imageId, b.path); } catch (e) { toast(e.message); return; }
+  const c = cur(), i = c.blocks.findIndex((x) => x.id === b.id); if (i < 0) return;
+  c.blocks.splice(i, 1); if (!c.blocks.length) c.blocks.push(block());
+  delete H[c.id]; markDirty(); renderEditor(); renderOutline(); renderStatus(); flush();
+}
+const fileIn = $("#img-file");
+function pickImage(b) { if (!canEdit || !cur()) return; replaceTarget = b || null; fileIn.value = ""; fileIn.click(); }
+fileIn.onchange = () => { const f = fileIn.files[0]; if (f) startImage(f, replaceTarget); replaceTarget = null; };
+$("#tb-img").onclick = () => pickImage(null);
+async function startImage(file, rb) {
+  if (!canEdit || !cur()) return;
+  if (!storageReady) { toast("Image storage is not set up yet. Add your Supabase URL and anon key in js/supabase-config.js (see README)."); return; }
+  let prep; try { prep = await prepareImage(file); } catch (e) { toast(e.message); return; }
+  const d = $("#img-dlg"), idx = fi();
+  $("#img-prev").src = prep.url; $("#img-info").textContent = `${file.name} · ${prep.width}×${prep.height}px · ${Math.round(prep.blob.size / 1024)} KB after compression`;
+  $("#img-cap").value = rb?.caption || ""; $("#img-alt").value = rb?.alt || ""; $("#img-ok").textContent = rb ? "Replace image" : "Insert image";
+  d.returnValue = "";
+  d.onclose = async () => {
+    URL.revokeObjectURL(prep.url); if (d.returnValue !== "ok") return;
+    const caption = $("#img-cap").value.trim(), alt = $("#img-alt").value.trim();
+    try {
+      toast("Uploading image…", true); const rec = await uploadImage(pid, me, prep, caption);
+      const w = +Math.min(M().maxW(), 5, prep.width / 96).toFixed(2);
+      const patch = { imageId: rec.id, url: rec.imageUrl, path: rec.storagePath, nw: prep.width, nh: prep.height, w, h: +(w * prep.height / prep.width).toFixed(2), lock: true, align: "center", caption, alt };
+      if (rb) {
+        const old = { id: rb.imageId, path: rb.path };
+        mutate((bl) => { const b = bl.find((x) => x.id === rb.id); if (!b) return false; Object.assign(b, patch); });
+        if (old.id) deleteImage(pid, old.id, old.path).catch(console.error);
+      } else mutate((bl) => { bl.splice(idx + 1, 0, block("fig", "", patch)); });
+      toast("Image added.", true);
+    } catch (e) { console.error(e); toast(e.message); }
+  };
+  d.showModal();
+}
+const center = $(".center");
+center.addEventListener("dragover", (e) => { if (canEdit && [...(e.dataTransfer?.types || [])].includes("Files")) e.preventDefault(); });
+center.addEventListener("drop", (e) => {
+  const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith("image/")); if (!f || !canEdit || !cur()) return;
+  e.preventDefault(); const fg = e.target.closest?.(".blk.fig"), tb = fg && cur().blocks.find((x) => x.id === fg.dataset.id);
+  startImage(f, tb && !tb.url ? tb : null);
+});
+$("#tb-tbl").onclick = () => {
+  if (!canEdit || !cur()) return; const d = $("#tbl-dlg"); d.returnValue = "";
+  d.onclose = () => {
+    if (d.returnValue !== "ok") return;
+    const r = Math.min(30, Math.max(1, parseInt($("#tbl-r").value) || 3)), c = Math.min(10, Math.max(1, parseInt($("#tbl-c").value) || 3)), idx = fi();
+    mutate((bl) => { const nb = block("tbl", "", { ...newTable(r, c), caption: $("#tbl-cap").value.trim(), label: "" }); bl.splice(idx + 1, 0, nb); });
+  };
+  d.showModal();
+};
 
 // ---------- Toolbar, shortcuts, init ----------
 document.querySelectorAll("[data-cmd]").forEach((b) => {
@@ -286,7 +371,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden) flush
 watchAuth(async (u) => {
   if (started) return;
   if (!u) { location.replace("index.html"); return; }
-  started = true;
+  started = true; me = u;
   try {
     project = pid && (await getProject(pid));
     if (!project) { $("#ptitle").textContent = "Project not found"; return; }
