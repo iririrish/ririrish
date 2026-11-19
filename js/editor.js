@@ -5,6 +5,7 @@ import { renderSpecial } from "./frontmatter.js";
 import { figBody, tblBody, newTable } from "./blocks-media.js";
 import { prepareImage, uploadImage, deleteImage, updateCaption } from "./images.js";
 import { storageReady } from "./supabase-config.js";
+import { initPreview, showPdf, setBusy, setMessage, setStale } from "./preview.js";
 
 const $ = (s) => document.querySelector(s);
 const pid = new URLSearchParams(location.search).get("id");
@@ -30,7 +31,7 @@ function setState(s, msg) {
   const el = $("#save"); el.className = "save " + s;
   el.textContent = { saved: "Saved", saving: "Saving…", unsaved: "Unsaved changes", error: "Save failed: " + (msg || "") }[s];
 }
-function markDirty(id = curId) { if (!canEdit) return; dirty.add(id); setState("unsaved"); clearTimeout(saveT); saveT = setTimeout(flush, 1500); }
+function markDirty(id = curId) { if (!canEdit) return; setStale(true); dirty.add(id); setState("unsaved"); clearTimeout(saveT); saveT = setTimeout(flush, 1500); }
 async function flush() {
   clearTimeout(saveT); commitNow(); if (!dirty.size) return;
   const ids = [...dirty]; dirty.clear(); setState("saving");
@@ -335,6 +336,33 @@ $("#tb-tbl").onclick = () => {
   d.showModal();
 };
 
+// ---------- PDF preview and layout modes ----------
+let compiled = false, compiling = false;
+async function recompile() {
+  if (compiling) return; compiling = true; setBusy(true); setMessage("Compiling…");
+  try {
+    const { buildPdf } = await import("./pdf.js");
+    const { bytes } = await buildPdf({ project, chapters: chs, mains: mains(), nums, media: mediaMap() });
+    await showPdf(bytes, ((project.title || "manuscript").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 60) || "manuscript") + ".pdf");
+    compiled = true; setMessage("");
+  } catch (e) { console.error(e); setMessage("Could not compile the PDF: " + e.message, true); }
+  compiling = false; setBusy(false);
+}
+function setLayout(l) {
+  document.body.classList.remove("lay-split", "lay-editor", "lay-pdf"); document.body.classList.add("lay-" + l);
+  document.querySelectorAll("[data-lay]").forEach((b) => b.classList.toggle("on", b.dataset.lay === l));
+  try { localStorage.setItem("ririrish-layout", l); } catch { /* preference only */ }
+  if (l !== "editor" && !compiled && !compiling && project) recompile();
+}
+function startPreview() {
+  initPreview({ compile: $("#pv-compile"), prev: $("#pv-prev"), next: $("#pv-next"), zin: $("#pv-zin"), zout: $("#pv-zout"), fit: $("#pv-fit"), dl: $("#pv-dl"),
+    page: $("#pv-page"), zoom: $("#pv-zoom"), stale: $("#pv-stale"), msg: $("#pv-msg"), scroll: $("#pv-scroll"), pages: $("#pv-pages") }, { onCompile: recompile });
+  let l = "split"; try { l = localStorage.getItem("ririrish-layout") || "split"; } catch { /* default */ }
+  setLayout(["split", "editor", "pdf"].includes(l) ? l : "split");
+}
+document.querySelectorAll("[data-lay]").forEach((b) => (b.onclick = () => { setLayout(b.dataset.lay); $("#lay-menu").open = false; }));
+document.addEventListener("click", (e) => { const m = $("#lay-menu"); if (m.open && !m.contains(e.target)) m.open = false; });
+
 // ---------- Toolbar, shortcuts, init ----------
 document.querySelectorAll("[data-cmd]").forEach((b) => {
   b.onmousedown = (e) => e.preventDefault();
@@ -379,6 +407,6 @@ watchAuth(async (u) => {
     canEdit = project.ownerId === u.uid;
     $("#roban").hidden = canEdit; $(".toolbar").classList.toggle("ro", !canEdit);
     ensureDefaults(project); chs = await loadChapters(pid); curId = (mains()[0] || chs[0]).id;
-    setState("saved"); renderAll();
+    setState("saved"); renderAll(); startPreview();
   } catch (e) { console.error(e); $("#ptitle").textContent = "Could not open this project"; toast(e.message); }
 });
