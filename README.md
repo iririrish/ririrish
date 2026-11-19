@@ -19,10 +19,12 @@ A thesis-writing site inspired by Overleaf, built for students. It will format m
 - Toolbar: undo, redo, bold, italic, underline, list styles, alignment. Shortcuts: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Z, Ctrl+Y, Ctrl+S
 - File outline that jumps to headings; automatic section numbers (1.1, 1.1.1)
 - BatStateU — Capstone Manuscript template (Times New Roman 12 pt, US Letter, 1 inch margins, double spacing, 0.5 inch indent, justified, 14 pt bold uppercase chapter headings, single-spaced abstract, Harvard references). Font, size, paper, margins, spacing, indent, alignment and heading size are adjustable under **Template settings**; the writing page follows them
+- **Matches the official capstone manuscript template** (`Castone_Manuscript_Template.pdf`): title page and approval sheet layouts, front matter order (Approval Sheet, Abstract, Acknowledgement, Table of Contents, Lists), chapter headings as `CHAPTER 1. TITLE`, section headings uppercase bold not indented, subsection headings proper case bold with a 5 pt indent, 2nd subsection with a 10 pt indent (numbered 1.1, 1.1.1, 1.1.1.1; no deeper levels), abstract with italic keywords and a 200–250 word / 5 keyword check
+- New projects start with the template's starter chapters and sections; existing projects are not changed
 - Editable title page: research title, multiple authors (Last, First M.I., add/remove/reorder), degree, program, specialization, university, campus, college, department, academic year, submission date, introductory statement and degree statement
 - Editable approval sheet: approval statement, optional certification, unlimited signatories (name, academic title and position, role, designation label; add/remove/reorder)
 - Statements support placeholders such as {title}, {authors}, {degree}, {program}, so changing a field updates every page that uses it
-- Table of contents generated from chapters, sections and subsections (page numbers arrive with the PDF in Phase 5)
+- Table of contents with dot leaders, generated from chapters and sections as in the template (page numbers arrive with the PDF in Phase 5)
 - Debounced autosave to Firestore with Saving / Saved / Error status; word count and estimated pages
 
 ## Technology stack
@@ -74,7 +76,7 @@ Push to your repo, then Settings > Pages > Deploy from branch (`main`, root). Al
 - Image, table, citation and equation buttons are disabled until Phase 4 (citations later).
 - The right panel is a placeholder; there is no PDF or paginated preview until Phase 5.
 - List of Tables, List of Figures and Bibliography are still "auto" placeholders (Phases 4 and later). The table of contents has no page numbers until Phase 5.
-- The BatStateU defaults follow the brief; **verify them against the latest official BatStateU manuscript guidelines before treating the template as final.** University name defaults to "Batangas State University" and is editable.
+- The template was checked against the supplied official PDF (US Letter, TNR 12, headings, title page, approval sheet, TOC). Margins and exact spacing are not stated in the PDF, so they stay at the brief's values; **verify them against the latest official BatStateU manuscript guidelines before treating the template as final.** Institution defaults (College of Engineering, Batangas State University - The National Engineering University, Alangilan, Batangas City) come from that PDF and are editable. The dean's name is left blank.
 - Template settings apply to the editor page; exact pagination and the exported PDF come in Phase 5.
 - Only the project owner can edit; collaborators get read access until Phase 7.
 - Rich text uses the browser's `execCommand`, which is deprecated but still supported everywhere.
