@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] - Phase 3: Manuscript Formatting
+### Added
+- BatStateU — Capstone Manuscript template with adjustable Template settings; the editor page now follows font, size, paper, margins, spacing, indent, alignment and chapter heading size. The abstract is single-spaced.
+- Editable title page with multiple authors (Last, First M.I.) and institutional fields; fully editable degree and introductory statements.
+- Editable approval sheet with unlimited signatories, roles, titles and designation labels; add, edit, remove, reorder.
+- Placeholder support in statements ({title}, {authors}, {degree}, {program}, ...).
+- Generated table of contents (no page numbers yet).
+- New files: `js/frontmatter.js`; new project fields `meta` and `format`.
+### Changed
+- Title Page, Approval Sheet and Table of Contents are now openable entries instead of "auto" placeholders.
+- Chapter headings in the editor show "CHAPTER N" and the title, bold and uppercase.
+- No Firestore rules change is needed.
+
 ## [0.2.2] - Bug fix
 ### Fixed
 - Login form still showed above the projects list after signing in. Views are now hidden with the `hidden` attribute and inline `display:none`, so they stay hidden even if the browser serves an old cached stylesheet.
