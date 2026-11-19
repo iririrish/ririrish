@@ -7,7 +7,7 @@ Write your thesis. Let ririrish handle the formatting.
 **Permanent development rule:** every change updates `README.md` and adds an entry to `CHANGELOG.md` (new features, bug fixes, changed setup or Firebase steps).
 
 ## Overview
-A thesis-writing site inspired by Overleaf, built for students. It will format manuscripts to the BatStateU Capstone Manuscript template automatically. **Current status: Phase 2 of 9 (thesis editor).**
+A thesis-writing site inspired by Overleaf, built for students. It will format manuscripts to the BatStateU Capstone Manuscript template automatically. **Current status: Phase 3 of 9 (manuscript formatting).**
 
 ## Features (Phase 1)
 - Sign up, sign in (email or Google), reset password
@@ -18,6 +18,11 @@ A thesis-writing site inspired by Overleaf, built for students. It will format m
 - Blocks: paragraphs, sections, subsections, lists (bullets, 1 2 3, A B C, a b c, I II III, i ii iii); add, edit, reorder (a section moves with its content), delete, convert section/subsection
 - Toolbar: undo, redo, bold, italic, underline, list styles, alignment. Shortcuts: Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Z, Ctrl+Y, Ctrl+S
 - File outline that jumps to headings; automatic section numbers (1.1, 1.1.1)
+- BatStateU — Capstone Manuscript template (Times New Roman 12 pt, US Letter, 1 inch margins, double spacing, 0.5 inch indent, justified, 14 pt bold uppercase chapter headings, single-spaced abstract, Harvard references). Font, size, paper, margins, spacing, indent, alignment and heading size are adjustable under **Template settings**; the writing page follows them
+- Editable title page: research title, multiple authors (Last, First M.I., add/remove/reorder), degree, program, specialization, university, campus, college, department, academic year, submission date, introductory statement and degree statement
+- Editable approval sheet: approval statement, optional certification, unlimited signatories (name, academic title and position, role, designation label; add/remove/reorder)
+- Statements support placeholders such as {title}, {authors}, {degree}, {program}, so changing a field updates every page that uses it
+- Table of contents generated from chapters, sections and subsections (page numbers arrive with the PDF in Phase 5)
 - Debounced autosave to Firestore with Saving / Saved / Error status; word count and estimated pages
 
 ## Technology stack
@@ -34,6 +39,7 @@ js/auth.js          authentication helpers
 js/projects.js      project CRUD (Firestore)
 js/app.js           dashboard UI
 js/editor.js        editor UI
+js/frontmatter.js   title page, approval sheet, table of contents
 js/doc-model.js     chapters and blocks, Firestore load/save
 firestore.rules  CHANGELOG.md  .nojekyll
 ```
@@ -52,6 +58,7 @@ firestore.rules  CHANGELOG.md  .nojekyll
 ### Firestore collections
 `projects/{projectId}`: `title, authors[], template, ownerId, ownerName, collaborators{uid: role}, collaboratorIds[], sharing, createdAt, updatedAt`.
 `projects/{id}/chapters/{chapterId}`: `kind` (front, main, back), `title`, `order`, `blocks[]` (`id, type p|h1|h2|list, html, align?, listStyle?`), `updatedAt`. One document per chapter keeps each under Firestore's 1 MiB limit and limits writes to the chapter being edited.
+Project document fields added in Phase 3: `meta` (degree, program, specialization, university, campus, college, department, academicYear, submissionDate, introStatement, degreeStatement, approvalStatement, certification, `authorList[]`, `signatories[]`) and `format` (template settings). Existing projects get defaults on first open; nothing is written until you edit.
 Planned: `projects/{id}/images`, `projects/{id}/versions`, `projects/{id}/lock` (Phases 4, 6, 7).
 
 ### Images (free plan)
@@ -66,7 +73,9 @@ Push to your repo, then Settings > Pages > Deploy from branch (`main`, root). Al
 ## Known limitations
 - Image, table, citation and equation buttons are disabled until Phase 4 (citations later).
 - The right panel is a placeholder; there is no PDF or paginated preview until Phase 5.
-- Title page, approval sheet, table of contents and lists are generated in Phase 3; they appear in the tree as "auto".
+- List of Tables, List of Figures and Bibliography are still "auto" placeholders (Phases 4 and later). The table of contents has no page numbers until Phase 5.
+- The BatStateU defaults follow the brief; **verify them against the latest official BatStateU manuscript guidelines before treating the template as final.** University name defaults to "Batangas State University" and is editable.
+- Template settings apply to the editor page; exact pagination and the exported PDF come in Phase 5.
 - Only the project owner can edit; collaborators get read access until Phase 7.
 - Rich text uses the browser's `execCommand`, which is deprecated but still supported everywhere.
 - Sharing UI is disabled until Phase 7.
@@ -75,7 +84,7 @@ Push to your repo, then Settings > Pages > Deploy from branch (`main`, root). Al
 - Projects created before this version, if any, need `ownerId` and `collaboratorIds` fields to appear.
 
 ## Development roadmap
-1 Foundation (done) · 2 Thesis editor (done) · 3 Manuscript formatting · 4 Images and tables · 5 PDF and preview · 6 Cloud saving and history · 7 Sharing and edit lock · 8 Advanced tools · 9 Testing and deployment
+1 Foundation (done) · 2 Thesis editor (done) · 3 Manuscript formatting (done) · 4 Images and tables · 5 PDF and preview · 6 Cloud saving and history · 7 Sharing and edit lock · 8 Advanced tools · 9 Testing and deployment
 
 ## Future tools (not implemented; no buttons in the UI)
 AI Proofread, Rewrite Selection, Explain Selection, Academic Tone, Consistency Checker, Citation Checker, Formatting Inspector, Document Comparison, Adviser Comments, Thesis Rescue, Defense Preparation.
