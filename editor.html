@@ -3,14 +3,16 @@
 <title>Editor — ririrish</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=0.4.0"><link rel="stylesheet" href="css/editor.css?v=0.4.0">
+<link rel="stylesheet" href="css/styles.css?v=0.5.0"><link rel="stylesheet" href="css/editor.css?v=0.5.0">
 </head>
 <body class="ed-body">
 <header class="topbar glass">
   <button class="btn only-small" id="toggle-left" aria-label="Show structure">Structure</button>
   <a class="logo sm" href="index.html" title="Back to projects">ririrish</a>
   <span class="sep">/</span><strong id="ptitle" class="ptitle">Loading…</strong>
-  <span class="grow"></span><span id="save" class="save" role="status"></span>
+  <span class="grow"></span>
+  <details class="menu" id="lay-menu"><summary class="btn" title="Choose what to show">Layout</summary><div class="menu-pop"><button data-lay="split">Editor + PDF</button><button data-lay="editor">Editor only</button><button data-lay="pdf">PDF only</button></div></details>
+  <span id="save" class="save" role="status"></span>
 </header>
 <div id="roban" class="banner" hidden>Read-only: only the project owner can edit in this version. Editor access arrives with sharing in Phase 7.</div>
 <div class="toolbar glass" role="toolbar" aria-label="Formatting">
@@ -29,9 +31,14 @@
     <div class="ph">File outline</div><nav id="outline"></nav>
   </aside>
   <main class="center"><div class="sheet" id="sheet"><div id="doc"></div></div></main>
-  <aside class="right" aria-label="Live preview">
-    <div class="ph">Live preview</div>
-    <p class="meta pad">The paginated manuscript preview and PDF export arrive in Phase 5. Until then, the editor shows structure and numbering only.</p>
+  <aside class="right" aria-label="PDF preview">
+    <div class="pvbar">
+      <button class="btn primary sm" id="pv-compile">Recompile</button><span id="pv-stale" class="meta" hidden>Edited since last compile</span><span class="grow"></span>
+      <button id="pv-prev" aria-label="Previous page" title="Previous page">‹</button><span id="pv-page" class="meta">– / –</span><button id="pv-next" aria-label="Next page" title="Next page">›</button>
+      <button id="pv-zout" aria-label="Zoom out" title="Zoom out">−</button><span id="pv-zoom" class="meta">100%</span><button id="pv-zin" aria-label="Zoom in" title="Zoom in">+</button>
+      <button id="pv-fit" title="Fit page to width">Fit width</button><button class="btn sm" id="pv-dl">Download PDF</button>
+    </div>
+    <div class="pvscroll" id="pv-scroll"><p id="pv-msg" class="meta pad">Press Recompile to build the PDF.</p><div class="pvpages" id="pv-pages"></div></div>
   </aside>
 </div>
 <footer class="status"><span id="st-words"></span><span id="st-pages"></span><span id="st-chap"></span></footer>
@@ -50,5 +57,5 @@
   <label>Caption<input id="tbl-cap" maxlength="300"></label>
   <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Insert table</button></div></form></dialog>
 <div id="toast" class="toast" role="status"></div>
-<script type="module" src="js/editor.js?v=0.4.0"></script>
+<script type="module" src="js/editor.js?v=0.5.0"></script>
 </body></html>
