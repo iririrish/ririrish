@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] - Phase 5: PDF and Document Preview
+### Added
+- PDF layout engine (`js/pdf.js`) on pdf-lib: fonts, margins, double spacing, indents, justified text, section/subsection/2nd subsection styles, lists (all six styles), tables (merged cells, alignment, column widths), figures and captions, title page, approval sheet, abstract with keywords, acknowledgement, chapters, appendix, page numbers (roman front matter, arabic body), table of contents and lists with real page numbers.
+- Live preview (`js/preview.js`, PDF.js): Recompile, page counter, previous/next, zoom in/out, fit width, Download PDF, stale-preview hint.
+- Layout menu: Editor + PDF, Editor only, PDF only; the PDF-only view fills the workspace; layouts resize correctly. The choice is remembered in the browser.
+### Fixed
+- Text is measured without kerning, matching how the PDF is drawn, so spaces and right edges stay correct.
+### Notes
+- No Firestore or Supabase changes. History (Phase 6) will join Layout in the header menu area.
+- Standard PDF fonts only; unsupported characters become "?".
+
+## [0.4.1] - Setup fix
+### Fixed
+- `supabase-setup.sql` can now be run repeatedly (drops existing policies before creating them); previously a second run failed with "policy already exists".
+
 ## [0.4.0] - Phase 4: Images and Tables
 ### Added
 - Image insertion by button or drag and drop, with preview, caption and alt text; replace and delete; alignment; corner resize handles (aspect ratio locked by default); numeric width and height in inches; restore original size; clamped to the page margins.
