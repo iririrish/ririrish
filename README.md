@@ -15,7 +15,7 @@ A thesis-writing site inspired by Overleaf, built for students. It will format m
 - Subtle glassmorphism UI with accessible contrast and a fallback without `backdrop-filter`
 
 ## Technology stack
-HTML, CSS, JavaScript (ES modules, no build step), Firebase Authentication, Firestore, Storage (used from Phase 4). PDF.js and a compile service arrive in Phase 5.
+HTML, CSS, JavaScript (ES modules, no build step), Firebase Authentication and Firestore on the free Spark plan (no Firebase Storage, no paid services). PDF.js and a compile service arrive in Phase 5.
 
 ## Folder structure
 ```
@@ -27,7 +27,7 @@ js/auth.js          authentication helpers
 js/projects.js      project CRUD (Firestore)
 js/app.js           dashboard UI
 js/editor-stub.js   editor placeholder logic
-firestore.rules  storage.rules  CHANGELOG.md  .nojekyll
+firestore.rules  CHANGELOG.md  .nojekyll
 ```
 
 ## Installation
@@ -38,15 +38,15 @@ firestore.rules  storage.rules  CHANGELOG.md  .nojekyll
 ## Firebase configuration
 1. Authentication > Sign-in method: enable **Email/Password** and **Google**.
 2. Authentication > Settings > Authorized domains: add `YOUR_USERNAME.github.io` (and `localhost`).
-3. Firestore: publish `firestore.rules`. Storage: publish `storage.rules`.
+3. Firestore Database > Create database (production mode), then Rules tab: publish `firestore.rules`. Stay on the free Spark plan; do not enable Storage.
 4. Firebase web config values are public identifiers; never put Admin credentials or private secrets in this repo.
 
 ### Firestore collections
 `projects/{projectId}`: `title, authors[], template, ownerId, ownerName, collaborators{uid: role}, collaboratorIds[], sharing, createdAt, updatedAt`.
-Planned: `projects/{id}/content`, `projects/{id}/versions`, `projects/{id}/lock` (Phases 2, 6, 7).
+Planned: `projects/{id}/content`, `projects/{id}/images`, `projects/{id}/versions`, `projects/{id}/lock` (Phases 2, 4, 6, 7).
 
-### Storage structure (from Phase 4)
-`projects/{projectId}/images/{file}`. Phase 1 rules deny all access.
+### Images (free plan)
+Firebase Storage needs a paid plan, so it is not used. From Phase 4, images will be resized and compressed in the browser and saved as small documents in `projects/{id}/images/{imageId}` in Firestore (each under the 1 MiB document limit). Free-tier Firestore limits: 1 GiB stored, 50k reads and 20k writes per day.
 
 ### Security rules
 Owners create, read, update, delete. Invited users (`collaboratorIds`) can read. Editor-role updates and edit locks are added in Phase 7.
@@ -57,7 +57,8 @@ Push to your repo, then Settings > Pages > Deploy from branch (`main`, root). Al
 ## Known limitations
 - No editor yet (placeholder page only).
 - Sharing UI is disabled until Phase 7.
-- Deleting a project does not yet remove subcollections or Storage files (none exist yet).
+- Deleting a project does not yet remove its subcollections (none exist yet).
+- Free plan: images are compressed and limited in size; very large images are downscaled.
 - Projects created before this version, if any, need `ownerId` and `collaboratorIds` fields to appear.
 
 ## Development roadmap
