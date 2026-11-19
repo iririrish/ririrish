@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Phase 1: owners have full control; invited users can read.
+    // Editor-role updates and edit locks are added in Phase 7.
+    match /projects/{projectId} {
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow read:   if request.auth != null
+                    && (resource.data.ownerId == request.auth.uid
+                        || request.auth.uid in resource.data.collaboratorIds);
+      allow update, delete: if request.auth != null
+                    && resource.data.ownerId == request.auth.uid
+                    && request.resource.data.ownerId == resource.data.ownerId;
+    }
+  }
+}

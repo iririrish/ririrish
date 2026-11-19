@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ririrish — write your thesis, we handle the formatting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div id="setup-banner" class="banner" hidden>Firebase is not configured yet. Paste your existing web app config into <code>js/firebase-config.js</code>.</div>
+
+<main id="auth-view" class="auth" hidden>
+  <section class="auth-intro">
+    <span class="logo">ririrish</span>
+    <h1>Write your thesis.<br>Let ririrish handle the formatting.</h1>
+    <p>Fonts, margins, numbering, tables of contents and citations follow your university template automatically.</p>
+  </section>
+  <section class="glass auth-card">
+    <h2 id="auth-title">Sign in to write</h2>
+    <form id="auth-form">
+      <label id="name-row" hidden>Full name<input id="display-name" autocomplete="name"></label>
+      <label>Email<input id="email" type="email" required autocomplete="email"></label>
+      <label>Password<input id="password" type="password" required minlength="6" autocomplete="current-password"></label>
+      <p id="auth-error" class="error" role="alert"></p>
+      <button class="btn primary" id="auth-submit">Sign in</button>
+    </form>
+    <button class="btn" id="google-btn">Continue with Google</button>
+    <div class="auth-links"><button class="link" id="auth-switch"></button><button class="link" id="forgot">Forgot password</button></div>
+  </section>
+</main>
+
+<div id="dash-view" hidden>
+  <header class="topbar glass">
+    <span class="logo sm">ririrish</span>
+    <span class="grow"></span>
+    <span class="meta" id="user-name"></span>
+    <button class="btn" id="logout">Sign out</button>
+  </header>
+  <main class="dash">
+    <div class="dash-head">
+      <h1>Projects</h1>
+      <button class="btn primary" data-new><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New project</button>
+    </div>
+    <div class="tools">
+      <input id="search" type="search" placeholder="Search projects" aria-label="Search projects">
+      <select id="sort" aria-label="Sort projects">
+        <option value="date:desc">Last modified, newest</option><option value="date:asc">Last modified, oldest</option>
+        <option value="name:asc">Name, A to Z</option><option value="name:desc">Name, Z to A</option>
+      </select>
+    </div>
+    <div id="list" class="list" aria-busy="true"></div>
+    <div id="empty" class="empty" hidden><p id="empty-text"></p><button class="btn primary" data-new>New project</button></div>
+  </main>
+</div>
+
+<dialog id="new-dlg" class="glass"><form id="new-form">
+  <h2>New thesis project</h2>
+  <label>Research title<input id="new-title" required maxlength="300"></label>
+  <label>Author <small>Last Name, First Name M.I.</small><input id="new-author" placeholder="Dela Cruz, Juan P."></label>
+  <label>Template<select id="tpl"></select></label>
+  <div class="actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Create project</button></div>
+</form></dialog>
+<dialog id="rename-dlg" class="glass"><form id="rename-form">
+  <h2>Rename project</h2><label>Project title<input id="rename-input" required maxlength="300"></label>
+  <div class="actions"><button type="button" class="btn" data-close>Cancel</button><button class="btn primary">Save name</button></div>
+</form></dialog>
+<dialog id="del-dlg" class="glass"><div>
+  <h2>Delete project?</h2><p>“<span id="del-name"></span>” will be permanently deleted. This cannot be undone.</p>
+  <div class="actions"><button class="btn" data-close>Keep project</button><button class="btn danger-fill" id="del-confirm">Delete project</button></div>
+</div></dialog>
+<div id="toast" class="toast" role="status"></div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
