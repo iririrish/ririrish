@@ -1,8 +1,9 @@
 // Supabase Storage holds the actual image files (free plan). Firestore holds only the image records.
 // Paste your Project URL and anon (public) key from Supabase > Project Settings > API.
 // The anon key is public by design; access is limited by the bucket and policies in supabase-setup.sql.
-export const SUPABASE_URL = "YOUR_SUPABASE_URL";
-export const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+export const SUPABASE_URL = "https://mqbmleretczqgmxyvdwr.supabase.co"; 
+export const SUPABASE_ANON_KEY = "sb_publishable_UZkC4Qis-nLz-BVfYvSReA_MExupUYg";
+
 export const BUCKET = "thesis-images";
 export const storageReady = !SUPABASE_URL.startsWith("YOUR_");
 
