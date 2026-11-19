@@ -61,3 +61,35 @@ export async function saveChapter(pid, c) {
   await updateDoc(doc(db, "projects", pid), { updatedAt: serverTimestamp() });
 }
 export const removeChapter = (pid, id) => deleteDoc(doc(db, "projects", pid, "chapters", id));
+
+// ---------- Project-level metadata and template settings (stored on the project document) ----------
+export const DEFAULT_FORMAT = { template: "batstateu-capstone", fontFamily: "Times New Roman", fontSize: 12, paper: "letter", margin: 1, lineSpacing: 2, indent: 0.5, align: "justify", chapterSize: 14 };
+export const DEFAULT_META = {
+  degree: "Bachelor of Science in Instrumentation and Control Engineering",
+  program: "Expanded Tertiary Education Equivalency and Accreditation Program",
+  specialization: "", university: "Batangas State University", campus: "", college: "", department: "", academicYear: "", submissionDate: "",
+  introStatement: "A Capstone Study Presented to the Faculty of the {college}",
+  degreeStatement: "In partial fulfillment of the requirements for the degree of\n{degree}\n{program}",
+  approvalStatement: "This capstone study entitled “{title}” prepared and submitted by {authors} in partial fulfillment of the requirements for the degree {degree} - {program} has been examined and hereby accepted.",
+  certification: ""
+};
+export const authorStr = (a) => [a.last && (a.first ? a.last + "," : a.last), a.first, a.mi].filter(Boolean).join(" ");
+function parseAuthor(s) {
+  const k = s.indexOf(","), last = (k < 0 ? s : s.slice(0, k)).trim();
+  const t = (k < 0 ? "" : s.slice(k + 1)).trim().split(/\s+/).filter(Boolean);
+  const mi = t.length > 1 && /^[A-Za-z]\.?$/.test(t.at(-1)) ? t.pop() : "";
+  return { id: uid(), last, first: t.join(" "), mi };
+}
+export function ensureDefaults(P) {
+  P.format = { ...DEFAULT_FORMAT, ...(P.format || {}) };
+  const m = (P.meta = { ...DEFAULT_META, ...(P.meta || {}) });
+  if (!m.authorList) m.authorList = (P.authors || []).map(parseAuthor);
+  if (!m.authorList.length) m.authorList = [{ id: uid(), last: "", first: "", mi: "" }];
+  m.authorList.forEach((a) => (a.id ||= uid()));
+  if (!m.signatories) m.signatories = ["Adviser", "Panel Member", "Chairperson", "Dean"].map((role) => ({ id: uid(), name: "", position: "", role, label: "" }));
+  return P;
+}
+export const saveMeta = (pid, P) => updateDoc(doc(db, "projects", pid), {
+  title: P.title, authors: P.meta.authorList.map(authorStr).filter(Boolean),
+  meta: JSON.parse(JSON.stringify(P.meta)), format: { ...P.format }, updatedAt: serverTimestamp()
+});
