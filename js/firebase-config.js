@@ -6,12 +6,12 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBYCDLvWHTU3nUORw_a1c4wChLehnYU7ZY",
+  authDomain: "ririrish.firebaseapp.com",
+  projectId: "ririrish",
+  storageBucket: "ririrish.firebasestorage.app",
+  messagingSenderId: "856996226712",
+  appId: "1:856996226712:web:8ab2ed85c3be2be63e12ed"
 };
 
 export const isConfigured = !firebaseConfig.apiKey.startsWith("YOUR_");
