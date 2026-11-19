@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.1] - Official template alignment
+### Added
+- Third heading level (2nd subsection, 1.1.1.1), as the official template allows "maximum of 2nd subsection". Promote/demote arrows replace the section/subsection toggle.
+- Abstract keywords block (italic) with a live word-count (200-250) and keyword-count (min 5) check in the status bar.
+- Approval sheet fields for the panel grade statement and acceptance statement.
+### Changed
+- Title page and approval sheet layouts now follow the official PDF; the title page leads with the title.
+- Front matter order is Abstract before Acknowledgement.
+- Chapter headings read `CHAPTER N. TITLE`; section headings uppercase bold; subsection headings proper case bold with 5 pt and 10 pt indents.
+- Table of contents uses dot leaders and lists chapters and sections only.
+- New projects use the official chapter titles and starter sections; the back-matter entry is "Appendix".
+- Default institution text and signatory roles (Adviser, Chairman, Members, Dean) come from the template and remain editable.
+### Notes
+- Existing projects keep their current chapters and text.
+- No Firestore rules change is needed.
+
 ## [0.3.0] - Phase 3: Manuscript Formatting
 ### Added
 - BatStateU — Capstone Manuscript template with adjustable Template settings; the editor page now follows font, size, paper, margins, spacing, indent, alignment and chapter heading size. The abstract is single-spaced.
