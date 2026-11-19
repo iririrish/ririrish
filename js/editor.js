@@ -18,7 +18,7 @@ const collapsed = {}, dirty = new Set(), H = {};
 let saveT, commitT, statusT;
 const cur = () => chs.find((c) => c.id === curId);
 const mains = () => chs.filter((c) => c.kind === "main").sort((a, b) => a.order - b.order);
-const lvl = (b) => (b.type === "h1" ? 1 : b.type === "h2" ? 2 : 9);
+const lvl = (b) => (b.type === "h1" ? 1 : b.type === "h2" ? 2 : b.type === "h3" ? 3 : 9);
 const toast = (m) => { const t = $("#toast"); t.textContent = m; t.className = "toast show err"; setTimeout(() => (t.className = "toast"), 4000); };
 
 // ---------- Save + undo ----------
@@ -75,16 +75,17 @@ function insertAfter(i, nb) { mutate((bl) => { bl.splice(i + 1, 0, nb); toFocus 
 function removeBlock(i) {
   mutate((bl) => { const prev = bl[i - 1] || bl[i + 1]; bl.splice(i, 1); if (!bl.length) bl.push(block()); toFocus = prev?.id || bl[0].id; });
 }
-function toggleLevel(i) { mutate((bl) => { bl[i].type = bl[i].type === "h1" ? "h2" : "h1"; toFocus = bl[i].id; }); }
+function shiftLevel(i, d) { mutate((bl) => { const T = ["h1", "h2", "h3"], k = T.indexOf(bl[i].type) + d; if (k < 0 || k > 2) return false; bl[i].type = T[k]; toFocus = bl[i].id; }); }
 function align(v) { if (!canEdit || !cur()) return; mutate((bl) => { const b = bl.find((x) => x.id === focusId); if (!b) return false; b.align = v; toFocus = b.id; }); }
 
 // ---------- Rendering ----------
 function nums(c) {
-  const r = []; let s = 0, ss = 0;
+  const r = []; let s = 0, ss = 0, sss = 0;
   const n = c.kind === "main" ? mains().findIndex((x) => x.id === c.id) + 1 : 0;
   for (const b of c.blocks) {
-    if (b.type === "h1") { s++; ss = 0; r.push(n ? `${n}.${s}` : ""); }
-    else if (b.type === "h2") { ss++; r.push(n ? `${n}.${s}.${ss}` : ""); }
+    if (b.type === "h1") { s++; ss = 0; sss = 0; r.push(n ? `${n}.${s}` : ""); }
+    else if (b.type === "h2") { ss++; sss = 0; r.push(n ? `${n}.${s}.${ss}` : ""); }
+    else if (b.type === "h3") { sss++; r.push(n ? `${n}.${s}.${ss}.${sss}` : ""); }
     else r.push("");
   }
   return r;
@@ -98,7 +99,7 @@ function blockEl(b, i, num) {
   const ctl = h("div", { class: "ctl" },
     h("button", { title: "Move up", "aria-label": "Move up", onclick: () => moveBlock(i, -1) }, "↑"),
     h("button", { title: "Move down", "aria-label": "Move down", onclick: () => moveBlock(i, 1) }, "↓"));
-  if (lvl(b) < 9) ctl.append(h("button", { title: b.type === "h1" ? "Make subsection" : "Make section", onclick: () => toggleLevel(i) }, "⇆"));
+  if (lvl(b) < 9) ctl.append(h("button", { title: "Promote (section ← subsection)", onclick: () => shiftLevel(i, -1) }, "←"), h("button", { title: "Demote (section → subsection)", onclick: () => shiftLevel(i, 1) }, "→"));
   ctl.append(h("button", { title: "Delete", "aria-label": "Delete block", onclick: () => removeBlock(i) }, "✕"));
   let ed;
   if (b.type === "list") { ed = h(b.listStyle === "bullet" ? "ul" : "ol", { class: "ed list" }); ed.style.listStyleType = LIST_CSS[b.listStyle || "bullet"]; ed.innerHTML = b.html || "<li><br></li>"; }
@@ -106,7 +107,7 @@ function blockEl(b, i, num) {
   if (b.align) ed.style.textAlign = b.align;
   if (canEdit) {
     ed.contentEditable = "true"; ed.spellcheck = true;
-    ed.setAttribute("aria-label", { p: "Paragraph", h1: "Section heading", h2: "Subsection heading", list: "List" }[b.type]);
+    ed.setAttribute("aria-label", { p: "Paragraph", h1: "Section heading", h2: "Subsection heading", h3: "2nd subsection heading", kw: "Keywords", list: "List" }[b.type]);
     ed.onfocus = () => (focusId = b.id);
     ed.oninput = () => {
       if (b.type === "list" && !ed.querySelector("li")) ed.innerHTML = "<li><br></li>";
@@ -121,6 +122,7 @@ function blockEl(b, i, num) {
     };
     wrap.append(ctl);
   } else ed.contentEditable = "false";
+  if (b.type === "kw") num = "Keywords:";
   if (num) wrap.append(h("span", { class: "num" }, num));
   wrap.append(ed); return wrap;
 }
@@ -129,16 +131,20 @@ function renderEditor() {
   $("#sheet").classList.toggle("bare", special); applyFormat();
   if (special) { renderSpecial(curId, ctx(), D); return; }
   const c = cur(); D.replaceChildren(); if (!c) return;
-  const label = { main: `Chapter ${mains().findIndex((x) => x.id === c.id) + 1}`, front: "Front matter", back: "Back matter" }[c.kind];
-  const title = h("input", { value: c.title, "aria-label": "Chapter title", readonly: c.kind !== "main" || !canEdit });
-  title.oninput = () => { c.title = title.value; markDirty(c.id); renderTree(); renderStatus(); };
-  D.append(h("div", { class: "chead" }, h("div", { class: "k" }, label), title));
+  const chNo = mains().findIndex((x) => x.id === c.id) + 1;
+  const title = h("textarea", { rows: 1, "aria-label": "Chapter title", readonly: c.kind !== "main" || !canEdit });
+  title.value = c.title;
+  const fit = () => { title.style.height = "auto"; title.style.height = title.scrollHeight + "px"; };
+  title.oninput = () => { c.title = title.value.replace(/\n/g, " "); fit(); markDirty(c.id); renderTree(); renderStatus(); };
+  title.onkeydown = (e) => { if (e.key === "Enter") e.preventDefault(); };
+  D.append(h("div", { class: "chead" + (c.kind === "main" ? "" : " solo") }, c.kind === "main" ? h("span", { class: "k" }, `Chapter ${chNo}.`) : "", title));
+  requestAnimationFrame(fit);
   const n = nums(c); c.blocks.forEach((b, i) => D.append(blockEl(b, i, n[i])));
   if (canEdit) {
     const add = (type, label) => h("button", { class: "btn", onclick: () => {
       const nb = block(type, type === "list" ? "<li><br></li>" : "", type === "list" ? { listStyle: "bullet" } : {}); insertAfter(fi(), nb);
     } }, "+ " + label);
-    D.append(h("div", { class: "addbar" }, add("p", "Paragraph"), add("h1", "Section"), add("h2", "Subsection"), add("list", "List")));
+    D.append(h("div", { class: "addbar" }, add("p", "Paragraph"), add("h1", "Section"), add("h2", "Subsection"), add("h3", "2nd subsection"), add("list", "List"), ...(c.id === "abstract" && !c.blocks.some((b) => b.type === "kw") ? [add("kw", "Keywords")] : [])));
   }
   if (toFocus) { const el = D.querySelector(`[data-id="${toFocus}"] .ed`); if (el) focusEnd(el); toFocus = null; }
 }
@@ -154,7 +160,7 @@ function renderTree() {
     if (open) items.forEach((i) => T.append(i));
   };
   const get = (id) => chs.find((c) => c.id === id);
-  group("front", "Front matter", [item({ id: "__title" }, "Title Page"), item({ id: "__approval" }, "Approval Sheet"), item(get("acknowledgement"), "Acknowledgement"), item(get("abstract"), "Abstract"), item({ id: "__toc" }, "Table of Contents"), auto("List of Tables"), auto("List of Figures")]);
+  group("front", "Front matter", [item({ id: "__title" }, "Title Page"), item({ id: "__approval" }, "Approval Sheet"), item(get("abstract"), "Abstract"), item(get("acknowledgement"), "Acknowledgement"), item({ id: "__toc" }, "Table of Contents"), auto("List of Tables"), auto("List of Figures")]);
   group("main", "Main matter", mains().map((c, i) => item(c, `Chapter ${i + 1}: ${c.title}`, canEdit ? [
     ia("↑", "Move up", () => moveCh(c, -1)), ia("↓", "Move down", () => moveCh(c, 1)), ia("✎", "Rename", () => renameCh(c)), ia("✕", "Delete chapter", () => deleteCh(c))] : [])));
   group("back", "Back matter", [auto("Bibliography"), item(get("appendices"), "Appendices")]);
@@ -179,6 +185,11 @@ function renderStatus() {
   $("#st-words").textContent = `${words.toLocaleString()} words`;
   $("#st-pages").textContent = `About ${Math.max(1, Math.ceil(words / 275))} pages double-spaced`;
   const c = cur(); $("#st-chap").textContent = c ? `Now editing: ${c.kind === "main" ? `Chapter ${mains().findIndex((x) => x.id === c.id) + 1}: ` : ""}${c.title}` : "";
+  if (curId === "abstract") {
+    const c = cur(), w = c.blocks.filter((b) => b.type !== "kw").reduce((n, b) => n + text(b.html).trim().split(/\s+/).filter(Boolean).length, 0);
+    const k = c.blocks.filter((b) => b.type === "kw").reduce((n, b) => n + text(b.html).split(/[,;]/).filter((x) => x.trim()).length, 0);
+    $("#st-chap").textContent += ` · Abstract: ${w} words (200–250), ${k} keywords (min 5)`;
+  }
   if (curId?.startsWith("__")) $("#st-chap").textContent = "Now editing: " + { __title: "Title Page", __approval: "Approval Sheet", __toc: "Table of Contents" }[curId];
 }
 const renderAll = () => { renderTree(); renderEditor(); renderOutline(); renderStatus(); };
