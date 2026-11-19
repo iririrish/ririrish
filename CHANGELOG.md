@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.2] - Bug fix
+### Fixed
+- Login form still showed above the projects list after signing in. Views are now hidden with the `hidden` attribute and inline `display:none`, so they stay hidden even if the browser serves an old cached stylesheet.
+- Added `?v=0.2.2` to CSS and JS links so browsers load the updated files. Bump this number whenever files change.
+- The login error message is cleared once sign-in succeeds.
+
+## [0.2.1] - Bug fix
+### Fixed
+- Signing in left the login form visible above the projects list. Author CSS (`display:grid`, `display:block`, `display:inline-flex`) was overriding the `hidden` attribute. Added a global `[hidden]{display:none!important}` rule in `css/styles.css`. This also fixes the always-visible "Full name" field on the sign-in form and the "Add chapter" button showing for read-only users.
+
 ## [0.2.0] - Phase 2: Thesis Editor
 ### Added
 - Three-panel editor (`editor.html`, `js/editor.js`, `js/doc-model.js`, `css/editor.css`).
