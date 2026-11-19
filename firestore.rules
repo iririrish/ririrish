@@ -21,6 +21,13 @@ service cloud.firestore {
         allow read:  if isMember(projectId);
         allow write: if isOwner(projectId);
       }
+
+      // Image records only; the files live in Supabase Storage.
+      match /images/{imageId} {
+        allow read:   if isMember(projectId);
+        allow create: if isOwner(projectId) && request.resource.data.ownerId == request.auth.uid;
+        allow update, delete: if isOwner(projectId);
+      }
     }
   }
 }

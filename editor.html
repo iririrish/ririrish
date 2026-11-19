@@ -3,7 +3,7 @@
 <title>Editor — ririrish</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=0.3.1"><link rel="stylesheet" href="css/editor.css?v=0.3.1">
+<link rel="stylesheet" href="css/styles.css?v=0.4.0"><link rel="stylesheet" href="css/editor.css?v=0.4.0">
 </head>
 <body class="ed-body">
 <header class="topbar glass">
@@ -18,7 +18,7 @@
   <button data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button><button data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button><button data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button><i></i>
   <select id="list-style" aria-label="Insert list or change list style"><option value="">List…</option></select><i></i>
   <button data-cmd="align-left" title="Align left">Left</button><button data-cmd="align-center" title="Center">Center</button><button data-cmd="align-right" title="Align right">Right</button><button data-cmd="align-justify" title="Justify">Justify</button><i></i>
-  <button disabled title="Coming in Phase 4">Image <small>soon</small></button><button disabled title="Coming in Phase 4">Table <small>soon</small></button>
+  <button id="tb-img" title="Insert image (PNG, JPG, WebP)">Image</button><button id="tb-tbl" title="Insert table">Table</button><input type="file" id="img-file" accept="image/png,image/jpeg,image/webp" hidden>
   <button disabled title="Coming soon">Citation <small>soon</small></button><button disabled title="Coming soon">Equation <small>soon</small></button><i></i>
   <button id="fmt-btn" title="Fonts, margins and spacing">Template settings</button>
 </div>
@@ -37,11 +37,18 @@
 <footer class="status"><span id="st-words"></span><span id="st-pages"></span><span id="st-chap"></span></footer>
 <dialog id="ask-dlg" class="glass"><form method="dialog"><h2 id="ask-title"></h2><label>Name<input id="ask-input" maxlength="200"></label>
   <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save</button></div></form></dialog>
-<dialog id="conf-dlg" class="glass"><form method="dialog"><h2>Delete chapter?</h2><p id="conf-text"></p>
-  <div class="actions"><button class="btn" value="cancel">Keep chapter</button><button class="btn danger-fill" value="ok">Delete chapter</button></div></form></dialog>
+<dialog id="conf-dlg" class="glass"><form method="dialog"><h2 id="conf-title">Delete chapter?</h2><p id="conf-text"></p>
+  <div class="actions"><button class="btn" id="conf-keep" value="cancel">Keep chapter</button><button class="btn danger-fill" id="conf-ok" value="ok">Delete chapter</button></div></form></dialog>
 <dialog id="fmt-dlg" class="glass"><form method="dialog"><h2>BatStateU — Capstone Manuscript</h2><div id="fmt-body" class="fmt"></div>
   <p class="meta">Abstract is single-spaced. References use Harvard style. Confirm these settings against the latest official BatStateU guidelines.</p>
   <div class="actions"><button type="button" class="btn" id="fmt-restore">Restore template defaults</button><button class="btn primary" value="ok">Done</button></div></form></dialog>
+<dialog id="img-dlg" class="glass"><form method="dialog"><h2>Insert image</h2><img id="img-prev" class="prev" alt="Preview"><p id="img-info" class="meta"></p>
+  <label>Caption<input id="img-cap" maxlength="300"></label><label>Alt text (describes the image for screen readers)<input id="img-alt" maxlength="300"></label>
+  <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" id="img-ok" value="ok">Insert image</button></div></form></dialog>
+<dialog id="tbl-dlg" class="glass"><form method="dialog"><h2>Insert table</h2>
+  <label>Rows<input id="tbl-r" type="number" min="1" max="30" value="3"></label><label>Columns<input id="tbl-c" type="number" min="1" max="10" value="3"></label>
+  <label>Caption<input id="tbl-cap" maxlength="300"></label>
+  <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Insert table</button></div></form></dialog>
 <div id="toast" class="toast" role="status"></div>
-<script type="module" src="js/editor.js?v=0.3.1"></script>
+<script type="module" src="js/editor.js?v=0.4.0"></script>
 </body></html>

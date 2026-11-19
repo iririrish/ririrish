@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0] - Phase 4: Images and Tables
+### Added
+- Image insertion by button or drag and drop, with preview, caption and alt text; replace and delete; alignment; corner resize handles (aspect ratio locked by default); numeric width and height in inches; restore original size; clamped to the page margins.
+- Image pipeline: browser compression to WebP, files in Supabase Storage (free plan), records in Firestore (`projects/{id}/images`). New files `js/images.js`, `js/supabase-config.js`, `supabase-setup.sql`.
+- Tables: insert with chosen rows and columns, edit cells, add/remove rows and columns, merge right/down, split, drag column resize, column alignment, bold/italic, header row, caption, label, delete. `js/blocks-media.js`.
+- Copy LaTeX for tables (`js/latex.js`): booktabs, `multicolumn`, `multirow`, escaped special characters.
+- Continuous figure and table numbering; generated List of Tables and List of Figures.
+- `[[figure: caption]]` and `[[table: caption]]` shortcuts.
+- Thin, quiet scrollbars site-wide.
+### Changed
+- Duplicating a project now also copies title page data, template settings and image files; deleting a project also deletes its image files and records.
+- The delete confirmation dialog is reused for images.
+### Notes
+- Republish `firestore.rules` and run `supabase-setup.sql`; fill in `js/supabase-config.js`.
+- The Supabase anon key is public, so the bucket is protected by size, type and path limits rather than per-user rules. See README.
+
 ## [0.3.1] - Official template alignment
 ### Added
 - Third heading level (2nd subsection, 1.1.1.1), as the official template allows "maximum of 2nd subsection". Promote/demote arrows replace the section/subsection toggle.
