@@ -1,7 +1,7 @@
 // Document data model: chapters and blocks, plus Firestore load/save.
 // Firestore layout: projects/{id}/chapters/{chapterId} = {kind, title, order, blocks[], updatedAt}
 import { db } from "./firebase-config.js";
-import { collection, doc, getDocs, setDoc, writeBatch, deleteDoc, updateDoc, serverTimestamp }
+import { collection, doc, getDocs, setDoc, writeBatch, deleteDoc, updateDoc, runTransaction, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
@@ -41,7 +41,7 @@ const SECTIONS = [["Background of the Study", "Project Objectives", "Scope and D
   ["Conceptual Literature", "Related Literature", "Synthesis"], ["Conceptual Framework", "Design Procedure and Tools Requirement"], [], ["Summary of Findings", "Conclusion", "Recommendations"]];
 const seedBlocks = (c) => c.kind === "main" ? [block(), ...SECTIONS[c.order].flatMap((t) => [block("h1", t), block()])]
   : c.id === "abstract" ? [block(), block("kw")] : [block()];
-const pack = (c) => ({ kind: c.kind, title: c.title, order: c.order, blocks: JSON.parse(JSON.stringify(c.blocks)), updatedAt: serverTimestamp() });
+const pack = (c, rev) => ({ kind: c.kind, title: c.title, order: c.order, rev, blocks: JSON.parse(JSON.stringify(c.blocks)), updatedAt: serverTimestamp() });
 
 export async function loadChapters(pid) {
   const col = collection(db, "projects", pid, "chapters");
@@ -52,19 +52,27 @@ export async function loadChapters(pid) {
       { id: "acknowledgement", kind: "front", title: "Acknowledgement", order: 1 },
       { id: "appendices", kind: "back", title: "Appendix", order: 0 },
       ...MAIN_TITLES.map((title, i) => ({ id: "c_" + uid(), kind: "main", title, order: i }))
-    ].map((c) => ({ ...c, blocks: seedBlocks(c) }));
-    const b = writeBatch(db); list.forEach((c) => b.set(doc(col, c.id), pack(c))); await b.commit();
+    ].map((c) => ({ ...c, rev: 1, blocks: seedBlocks(c) }));
+    const b = writeBatch(db); list.forEach((c) => b.set(doc(col, c.id), pack(c, 1))); await b.commit();
     return list;
   }
   return snap.docs.map((d) => {
     const v = d.data(), blocks = (v.blocks || []).map((x) => ({ ...x, html: clean(x.html) }));
-    return { id: d.id, kind: v.kind, title: v.title, order: v.order ?? 0, blocks: blocks.length ? blocks : [block()] };
+    return { id: d.id, kind: v.kind, title: v.title, order: v.order ?? 0, rev: v.rev || 0, blocks: blocks.length ? blocks : [block()] };
   });
 }
-export async function saveChapter(pid, c) {
-  await setDoc(doc(db, "projects", pid, "chapters", c.id), pack(c));
-  await updateDoc(doc(db, "projects", pid), { updatedAt: serverTimestamp() });
+export class ConflictError extends Error {}
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("The connection timed out."), { code: "deadline-exceeded" })), ms))]);
+// Saves one chapter; refuses to overwrite a newer copy saved from another device unless force is true.
+export async function saveChapter(pid, c, force = false) {
+  const ref = doc(db, "projects", pid, "chapters", c.id);
+  c.rev = await withTimeout(runTransaction(db, async (tx) => {
+    const s = await tx.get(ref), remote = s.exists() ? s.data().rev || 0 : null;
+    if (!force && remote !== null && remote !== (c.rev || 0)) throw new ConflictError("This chapter was changed somewhere else.");
+    const next = (remote ?? c.rev ?? 0) + 1; tx.set(ref, pack(c, next)); return next;
+  }), 20000);
 }
+export const touchProject = (pid) => updateDoc(doc(db, "projects", pid), { updatedAt: serverTimestamp() });
 export const removeChapter = (pid, id) => deleteDoc(doc(db, "projects", pid, "chapters", id));
 
 // ---------- Project-level metadata and template settings (stored on the project document) ----------
@@ -96,7 +104,13 @@ export function ensureDefaults(P) {
   if (!m.signatories) m.signatories = [["Adviser", "Engr.", ""], ["Chairperson", "Engr.", "Chairman"], ["Panel Member", "Engr.", "Member"], ["Panel Member", "Engr.", "Member"], ["Dean", "Dr.", "Dean, College of Engineering"]].map(([role, position, label]) => ({ id: uid(), name: "", position, role, label }));
   return P;
 }
-export const saveMeta = (pid, P) => updateDoc(doc(db, "projects", pid), {
-  title: P.title, authors: P.meta.authorList.map(authorStr).filter(Boolean),
-  meta: JSON.parse(JSON.stringify(P.meta)), format: { ...P.format }, updatedAt: serverTimestamp()
-});
+export async function saveMeta(pid, P, force = false) {
+  const ref = doc(db, "projects", pid);
+  P.metaRev = await withTimeout(runTransaction(db, async (tx) => {
+    const s = await tx.get(ref), remote = s.data()?.metaRev || 0;
+    if (!force && remote !== (P.metaRev || 0)) throw new ConflictError("The project details were changed somewhere else.");
+    const next = remote + 1;
+    tx.update(ref, { title: P.title, authors: P.meta.authorList.map(authorStr).filter(Boolean), meta: JSON.parse(JSON.stringify(P.meta)), format: { ...P.format }, metaRev: next, updatedAt: serverTimestamp() });
+    return next;
+  }), 20000);
+}
