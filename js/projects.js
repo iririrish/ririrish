@@ -2,7 +2,7 @@ import { db } from "./firebase-config.js";
 import { uid } from "./doc-model.js";
 import { copyImage, removeFiles } from "./images.js";
 import {
-  collection, doc, addDoc, updateDoc, getDoc, getDocs, writeBatch, query, where,
+  collection, doc, addDoc, updateDoc, getDoc, getDocs, writeBatch, deleteDoc, query, where,
   onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -38,9 +38,12 @@ export async function duplicateProject(user, p) {
 export const renameProject = (id, title) =>
   updateDoc(doc(db, "projects", id), { title: title.trim(), updatedAt: serverTimestamp() });
 export async function deleteProject(id) {
-  const [cs, ims] = await Promise.all([getDocs(collection(db, "projects", id, "chapters")), getDocs(collection(db, "projects", id, "images"))]);
+  const [cs, ims, vs] = await Promise.all([getDocs(collection(db, "projects", id, "chapters")), getDocs(collection(db, "projects", id, "images")), getDocs(collection(db, "projects", id, "versions"))]);
   await removeFiles(ims.docs.map((d) => d.data().storagePath)).catch(console.error);
-  const b = writeBatch(db); cs.forEach((d) => b.delete(d.ref)); ims.forEach((d) => b.delete(d.ref)); b.delete(doc(db, "projects", id)); await b.commit();
+  const refs = [...cs.docs.map((d) => d.ref), ...ims.docs.map((d) => d.ref)];
+  for (const v of vs.docs) { (await getDocs(collection(db, "projects", id, "versions", v.id, "chapters"))).forEach((d) => refs.push(d.ref)); refs.push(v.ref); }
+  for (let i = 0; i < refs.length; i += 400) { const b = writeBatch(db); refs.slice(i, i + 400).forEach((r) => b.delete(r)); await b.commit(); }
+  await deleteDoc(doc(db, "projects", id));
 }
 export async function getProject(id) {
   const s = await getDoc(doc(db, "projects", id));
