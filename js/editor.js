@@ -1,10 +1,11 @@
 import { watchAuth } from "./auth.js";
 import { getProject } from "./projects.js";
-import { block, clean, text, LIST_CSS, LIST_LABELS, loadChapters, saveChapter, removeChapter, ensureDefaults, saveMeta, DEFAULT_FORMAT } from "./doc-model.js";
+import { block, clean, text, LIST_CSS, LIST_LABELS, loadChapters, saveChapter, removeChapter, ensureDefaults, saveMeta, DEFAULT_FORMAT, ConflictError, touchProject } from "./doc-model.js";
 import { renderSpecial } from "./frontmatter.js";
 import { figBody, tblBody, newTable } from "./blocks-media.js";
 import { prepareImage, uploadImage, deleteImage, updateCaption } from "./images.js";
 import { storageReady } from "./supabase-config.js";
+import { initHistory } from "./history.js";
 import { initPreview, showPdf, setBusy, setMessage, setStale } from "./preview.js";
 
 const $ = (s) => document.querySelector(s);
@@ -21,7 +22,7 @@ let project, chs = [], curId = null, canEdit = false, focusId = null, toFocus = 
 const collapsed = {}, dirty = new Set(), H = {};
 let saveT, commitT, statusT;
 const cur = () => chs.find((c) => c.id === curId);
-const mains = () => chs.filter((c) => c.kind === "main").sort((a, b) => a.order - b.order);
+const mains = (l = chs) => l.filter((c) => c.kind === "main").sort((a, b) => a.order - b.order);
 const lvl = (b) => (b.type === "h1" ? 1 : b.type === "h2" ? 2 : b.type === "h3" ? 3 : 9);
 let me, mm = new Map(), replaceTarget = null;
 const toast = (m, ok) => { const t = $("#toast"); t.textContent = m; t.className = "toast show" + (ok ? "" : " err"); setTimeout(() => (t.className = "toast"), 4000); };
@@ -29,16 +30,44 @@ const toast = (m, ok) => { const t = $("#toast"); t.textContent = m; t.className
 // ---------- Save + undo ----------
 function setState(s, msg) {
   const el = $("#save"); el.className = "save " + s;
-  el.textContent = { saved: "Saved", saving: "Saving…", unsaved: "Unsaved changes", error: "Save failed: " + (msg || "") }[s];
+  el.textContent = { saved: "Saved", saving: "Saving…", unsaved: "Unsaved changes", offline: "Offline. Changes will save when you reconnect.", conflict: "Changed elsewhere. Click to resolve.", error: "Save failed: " + (msg || "") + " (click to retry)" }[s];
 }
-function markDirty(id = curId) { if (!canEdit) return; setStale(true); dirty.add(id); setState("unsaved"); clearTimeout(saveT); saveT = setTimeout(flush, 1500); }
-async function flush() {
-  clearTimeout(saveT); commitNow(); if (!dirty.size) return;
-  const ids = [...dirty]; dirty.clear(); setState("saving");
+function markDirty(id = curId) {
+  if (!canEdit) return; setStale(true); dirty.add(id); setState("unsaved"); firstDirty ||= Date.now();
+  clearTimeout(saveT); saveT = setTimeout(flush, Date.now() - firstDirty > 20000 ? 0 : 1500); // wait for a pause, but never longer than 20 s
+}
+let saved = {}, savedMeta = "", savingP = null, again = false, firstDirty = 0, retryT, conflictOpen = false;
+const sig = (c) => JSON.stringify([c.title, c.order, c.blocks]), metaSig = () => JSON.stringify([project.title, project.meta, project.format]);
+function initSaved() { saved = {}; chs.forEach((c) => (saved[c.id] = sig(c))); savedMeta = metaSig(); }
+function conflict() {
+  setState("conflict"); if (conflictOpen) return; conflictOpen = true; const d = $("#conflict-dlg"); d.returnValue = "";
+  d.onclose = () => { conflictOpen = false; if (d.returnValue === "reload") { dirty.clear(); location.reload(); } else if (d.returnValue === "keep") flush(true); };
+  d.showModal();
+}
+function flush(force) {
+  clearTimeout(saveT); commitNow();
+  if (savingP) { again = true; return savingP; }
+  savingP = doFlush(force === true).finally(() => { savingP = null; if (again) { again = false; if (dirty.size) flush(); } });
+  return savingP;
+}
+async function doFlush(force) {
+  if (!dirty.size) return;
+  const ids = [...dirty]; dirty.clear(); setState("saving"); let wrote = false;
   try {
-    await Promise.all(ids.map((id) => { const c = chs.find((x) => x.id === id); return id === "__meta" ? saveMeta(pid, project) : c && saveChapter(pid, c); }));
-    setState(dirty.size ? "unsaved" : "saved");
-  } catch (e) { console.error(e); ids.forEach((i) => dirty.add(i)); setState("error", e.message); }
+    for (const id of ids) { // only changed content is written
+      if (id === "__meta") { const j = metaSig(); if (force || j !== savedMeta) { await saveMeta(pid, project, force); savedMeta = j; wrote = "meta"; } continue; }
+      const c = chs.find((x) => x.id === id); if (!c) continue;
+      const j = sig(c); if (!force && saved[id] === j) continue;
+      await saveChapter(pid, c, force); saved[id] = j; wrote ||= true;
+    }
+    if (wrote === true) await touchProject(pid);
+    firstDirty = 0; setState(dirty.size ? "unsaved" : "saved");
+  } catch (e) {
+    console.error(e); ids.forEach((i) => dirty.add(i));
+    if (e instanceof ConflictError) conflict();
+    else if (!navigator.onLine || ["unavailable", "deadline-exceeded"].includes(e.code)) { setState("offline"); clearTimeout(retryT); retryT = setTimeout(() => flush(), 8000); }
+    else setState("error", e.message);
+  }
 }
 const hist = (c) => (H[c.id] ||= { u: [JSON.stringify(c.blocks)], r: [] });
 function commitNow() {
@@ -84,9 +113,9 @@ function shiftLevel(i, d) { mutate((bl) => { const T = ["h1", "h2", "h3"], k = T
 function align(v) { if (!canEdit || !cur()) return; mutate((bl) => { const b = bl.find((x) => x.id === focusId); if (!b) return false; b.align = v; toFocus = b.id; }); }
 
 // ---------- Rendering ----------
-function nums(c) {
+function nums(c, l = chs) {
   const r = []; let s = 0, ss = 0, sss = 0;
-  const n = c.kind === "main" ? mains().findIndex((x) => x.id === c.id) + 1 : 0;
+  const n = c.kind === "main" ? mains(l).findIndex((x) => x.id === c.id) + 1 : 0;
   for (const b of c.blocks) {
     if (b.type === "h1") { s++; ss = 0; sss = 0; r.push(n ? `${n}.${s}` : ""); }
     else if (b.type === "h2") { ss++; sss = 0; r.push(n ? `${n}.${s}.${ss}` : ""); }
@@ -274,10 +303,10 @@ const M = () => ({ h, canEdit, project, maxW: () => (project.format.paper === "a
   touch: (s) => { if (s) commitNow(); else schedule(); markDirty(); }, toast, pick: (b) => pickImage(b), delFig: (b) => delFigure(b),
   removeBlock: (b) => { const i = cur().blocks.findIndex((x) => x.id === b.id); if (i >= 0) removeBlock(i); },
   syncCaption: (b) => b.imageId && updateCaption(pid, b.imageId, b.caption) });
-const docOrder = () => [...chs.filter((c) => c.kind === "front").sort((a, b) => a.order - b.order), ...mains(), ...chs.filter((c) => c.kind === "back").sort((a, b) => a.order - b.order)];
-function mediaMap() {
+const docOrder = (l = chs) => [...l.filter((c) => c.kind === "front").sort((a, b) => a.order - b.order), ...mains(l), ...l.filter((c) => c.kind === "back").sort((a, b) => a.order - b.order)];
+function mediaMap(l = chs) {
   const m = new Map(); let f = 0, t = 0;
-  for (const c of docOrder()) for (const b of c.blocks) {
+  for (const c of docOrder(l)) for (const b of c.blocks) {
     if (b.type === "fig") m.set(b.id, { kind: "figure", num: ++f, caption: b.caption }); else if (b.type === "tbl") m.set(b.id, { kind: "table", num: ++t, caption: b.caption });
   }
   return m;
@@ -335,6 +364,37 @@ $("#tb-tbl").onclick = () => {
   };
   d.showModal();
 };
+
+// ---------- History glue ----------
+function applyRestore(r) {
+  for (const k of Object.keys(H)) delete H[k];
+  chs = r.chapters.map((c) => ({ ...c, blocks: c.blocks?.length ? c.blocks.map((b) => ({ ...b, html: clean(b.html) })) : [block()] }));
+  Object.assign(project, { title: r.snapshot.title, authors: r.snapshot.authors || [], meta: r.snapshot.meta, format: { ...DEFAULT_FORMAT, ...r.snapshot.format }, metaRev: r.metaRev });
+  ensureDefaults(project); initSaved(); dirty.clear(); setState("saved");
+  if (!curId.startsWith("__") && !chs.some((c) => c.id === curId)) curId = (mains()[0] || chs[0]).id;
+  $("#ptitle").textContent = project.title; renderAll(); setStale(true);
+}
+async function previewVersion(v) {
+  if (document.body.classList.contains("lay-editor")) setLayout("pdf");
+  setBusy(true); setMessage(`Building a preview of “${v.name}”…`);
+  try {
+    const list = v.chapters.map((c) => ({ ...c, blocks: (c.blocks || []).map((b) => ({ ...b, html: clean(b.html) })) }));
+    const { buildPdf } = await import("./pdf.js");
+    const p = { ...project, title: v.snapshot.title, meta: v.snapshot.meta, format: { ...DEFAULT_FORMAT, ...v.snapshot.format } };
+    const { bytes } = await buildPdf({ project: p, chapters: list, mains: mains(list), nums: (c) => nums(c, list), media: mediaMap(list) });
+    await showPdf(bytes, "version_" + (v.name || "preview").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 40) + ".pdf");
+    setMessage(`Previewing saved version “${v.name}”. Press Recompile to return to your current manuscript.`);
+  } catch (e) { console.error(e); setMessage("Could not build the preview: " + e.message, true); }
+  setBusy(false);
+}
+function startHistory() {
+  initHistory({ h, pid: () => pid, me: () => me, canEdit: () => canEdit, toast, confirm: confirmDel,
+    snapshot: () => ({ title: project.title, authors: project.authors || [], meta: project.meta, format: project.format, metaRev: project.metaRev || 0, chapters: chs }),
+    flush: async () => { await flush(); if (dirty.size) throw new Error("Your latest changes are not saved yet. Try again once you are online."); },
+    applyRestore, previewVersion });
+}
+$("#save").onclick = () => { const s = $("#save").className; if (s.includes("conflict")) conflict(); else if (s.includes("error") || s.includes("offline")) flush(); };
+addEventListener("online", () => { if (dirty.size) flush(); });
 
 // ---------- PDF preview and layout modes ----------
 let compiled = false, compiling = false;
@@ -406,7 +466,7 @@ watchAuth(async (u) => {
     $("#ptitle").textContent = project.title; document.title = project.title + " — ririrish";
     canEdit = project.ownerId === u.uid;
     $("#roban").hidden = canEdit; $(".toolbar").classList.toggle("ro", !canEdit);
-    ensureDefaults(project); chs = await loadChapters(pid); curId = (mains()[0] || chs[0]).id;
-    setState("saved"); renderAll(); startPreview();
+    ensureDefaults(project); chs = await loadChapters(pid); curId = (mains()[0] || chs[0]).id; initSaved();
+    setState("saved"); renderAll(); startPreview(); startHistory();
   } catch (e) { console.error(e); $("#ptitle").textContent = "Could not open this project"; toast(e.message); }
 });
