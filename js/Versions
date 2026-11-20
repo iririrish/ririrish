@@ -1,0 +1,50 @@
+// Version history stored in Firestore: projects/{id}/versions/{vid} (details) and .../versions/{vid}/chapters/{cid} (copy of each chapter).
+import { db } from "./firebase-config.js";
+import { collection, doc, getDoc, getDocs, query, orderBy, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { uid, text } from "./doc-model.js";
+
+export const MAX_VERSIONS = 30;
+const vcol = (pid) => collection(db, "projects", pid, "versions");
+const ccol = (pid, vid) => collection(db, "projects", pid, "versions", vid, "chapters");
+
+export async function listVersions(pid) {
+  const s = await getDocs(query(vcol(pid), orderBy("createdAt", "desc")));
+  return s.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+export async function getVersion(pid, vid) {
+  const [v, cs] = await Promise.all([getDoc(doc(vcol(pid), vid)), getDocs(ccol(pid, vid))]);
+  if (!v.exists()) throw new Error("That version no longer exists.");
+  return { snapshot: v.data().snapshot, chapters: cs.docs.map((d) => ({ id: d.id, ...d.data() })) };
+}
+export async function deleteVersion(pid, vid) {
+  const cs = await getDocs(ccol(pid, vid)), b = writeBatch(db);
+  cs.forEach((d) => b.delete(d.ref)); b.delete(doc(vcol(pid), vid)); await b.commit();
+}
+// snap: { title, authors, meta, format, chapters }. Automatic versions (made before a restore) are pruned first when the limit is reached.
+export async function createVersion(pid, user, snap, name, auto = false) {
+  const list = await listVersions(pid);
+  if (list.length >= MAX_VERSIONS) {
+    const victim = [...list].reverse().find((v) => v.auto);
+    if (!victim) throw new Error(`You already have ${MAX_VERSIONS} saved versions. Delete one first.`);
+    await deleteVersion(pid, victim.id);
+  }
+  const vid = uid() + uid(), b = writeBatch(db);
+  const words = snap.chapters.reduce((n, c) => n + c.blocks.reduce((m, x) => m + text(x.html).trim().split(/\s+/).filter(Boolean).length, 0), 0);
+  b.set(doc(vcol(pid), vid), { name, auto, createdBy: user.uid, createdAt: serverTimestamp(), words, chapterCount: snap.chapters.length,
+    snapshot: JSON.parse(JSON.stringify({ title: snap.title, authors: snap.authors, meta: snap.meta, format: snap.format })) });
+  snap.chapters.forEach((c) => b.set(doc(ccol(pid, vid), c.id), { kind: c.kind, title: c.title, order: c.order, blocks: JSON.parse(JSON.stringify(c.blocks)) }));
+  await b.commit(); return vid;
+}
+// Replaces the current manuscript with a version in one atomic batch. cur is the live snapshot (for revision numbers).
+export async function restoreVersion(pid, vid, cur) {
+  const v = await getVersion(pid, vid); if (!v.chapters.length) throw new Error("This version has no content to restore.");
+  const b = writeBatch(db), keep = new Set();
+  v.chapters.forEach((c) => {
+    keep.add(c.id); c.rev = (cur.chapters.find((x) => x.id === c.id)?.rev || 0) + 1;
+    b.set(doc(db, "projects", pid, "chapters", c.id), { kind: c.kind, title: c.title, order: c.order, rev: c.rev, blocks: c.blocks, updatedAt: serverTimestamp() });
+  });
+  cur.chapters.forEach((c) => { if (!keep.has(c.id)) b.delete(doc(db, "projects", pid, "chapters", c.id)); });
+  const s = v.snapshot, metaRev = (cur.metaRev || 0) + 1;
+  b.update(doc(db, "projects", pid), { title: s.title, authors: s.authors || [], meta: s.meta, format: s.format, metaRev, updatedAt: serverTimestamp() });
+  await b.commit(); return { chapters: v.chapters, snapshot: s, metaRev };
+}
