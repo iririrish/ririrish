@@ -3,7 +3,7 @@
 <title>Editor — ririrish</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css?v=0.5.0"><link rel="stylesheet" href="css/editor.css?v=0.5.0">
+<link rel="stylesheet" href="css/styles.css?v=0.6.0"><link rel="stylesheet" href="css/editor.css?v=0.6.0">
 </head>
 <body class="ed-body">
 <header class="topbar glass">
@@ -11,6 +11,7 @@
   <a class="logo sm" href="index.html" title="Back to projects">ririrish</a>
   <span class="sep">/</span><strong id="ptitle" class="ptitle">Loading…</strong>
   <span class="grow"></span>
+  <button class="btn" id="hist-btn" title="Saved versions">History</button>
   <details class="menu" id="lay-menu"><summary class="btn" title="Choose what to show">Layout</summary><div class="menu-pop"><button data-lay="split">Editor + PDF</button><button data-lay="editor">Editor only</button><button data-lay="pdf">PDF only</button></div></details>
   <span id="save" class="save" role="status"></span>
 </header>
@@ -56,6 +57,14 @@
   <label>Rows<input id="tbl-r" type="number" min="1" max="30" value="3"></label><label>Columns<input id="tbl-c" type="number" min="1" max="10" value="3"></label>
   <label>Caption<input id="tbl-cap" maxlength="300"></label>
   <div class="actions"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Insert table</button></div></form></dialog>
+<dialog id="hist-dlg" class="glass"><div class="hh"><h2>History</h2><span id="hist-count" class="meta"></span></div>
+  <form id="hist-form" class="hsave"><input id="hist-name" maxlength="80" placeholder="Name this version (e.g. Draft for adviser)" aria-label="Version name"><button class="btn primary" id="hist-save">Save version</button></form>
+  <div id="hist-list" class="hlist"></div>
+  <p class="meta">Up to 30 versions are kept. Restoring first saves your current manuscript as a version. Images you delete after saving a version cannot be restored.</p>
+  <div class="actions"><button class="btn" id="hist-close" type="button">Close</button></div></dialog>
+<dialog id="conflict-dlg" class="glass"><form method="dialog"><h2>Changed on another device</h2>
+  <p>This project was saved from somewhere else after you opened it. Reload to see the latest copy (unsaved changes here will be lost), or keep your version to overwrite the other one.</p>
+  <div class="actions"><button class="btn" value="reload">Reload latest</button><button class="btn danger-fill" value="keep">Keep my version</button></div></form></dialog>
 <div id="toast" class="toast" role="status"></div>
-<script type="module" src="js/editor.js?v=0.5.0"></script>
+<script type="module" src="js/editor.js?v=0.6.0"></script>
 </body></html>
