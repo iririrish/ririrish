@@ -1,0 +1,47 @@
+// History dialog: save named versions, preview, restore, delete.
+import { listVersions, createVersion, getVersion, deleteVersion, restoreVersion, MAX_VERSIONS } from "./versions.js";
+const $ = (s) => document.querySelector(s);
+
+export function initHistory(api) {
+  const dlg = $("#hist-dlg"), box = $("#hist-list"), nameIn = $("#hist-name"), h = api.h;
+  const fmt = (ts) => (ts?.toDate ? ts.toDate().toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "Just now");
+  const busy = (b) => { dlg.classList.toggle("busy", b); $("#hist-save").disabled = b; };
+  const btn = (t, fn, cls = "") => h("button", { class: "btn sm " + cls, type: "button", onclick: fn }, t);
+  async function refresh() {
+    box.textContent = "Loading…";
+    try {
+      const vs = await listVersions(api.pid()); $("#hist-count").textContent = `${vs.length} / ${MAX_VERSIONS} versions`; box.replaceChildren();
+      if (!vs.length) box.append(h("p", { class: "meta hpad" }, "No saved versions yet. Save one before big changes."));
+      for (const v of vs) box.append(h("div", { class: "hrow" },
+        h("div", { class: "hinfo" }, h("strong", {}, v.name || "Untitled"), v.auto ? h("em", {}, "auto") : "", h("div", { class: "meta" }, `${fmt(v.createdAt)} · ${(v.words || 0).toLocaleString()} words · ${v.chapterCount || 0} chapters`)),
+        h("div", { class: "hbtns" }, btn("Preview", () => preview(v)), ...(api.canEdit() ? [btn("Restore", () => restore(v)), btn("Delete", () => remove(v), "danger")] : []))));
+    } catch (e) { box.textContent = "Could not load versions: " + e.message; }
+  }
+  async function save() {
+    const name = nameIn.value.trim() || `Version ${new Date().toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`; busy(true);
+    try { await api.flush(); await createVersion(api.pid(), api.me(), api.snapshot(), name, false); nameIn.value = ""; api.toast("Version saved.", true); await refresh(); }
+    catch (e) { api.toast(e.message); }
+    busy(false);
+  }
+  async function restore(v) {
+    if (!(await api.confirm(`“${v.name}” will replace your current manuscript. Your current manuscript is saved to History first, so you can go back.`, "Restore this version?", "Restore", "Cancel"))) return;
+    busy(true);
+    try {
+      await api.flush(); await createVersion(api.pid(), api.me(), api.snapshot(), `Before restoring “${v.name}”`, true);
+      api.applyRestore(await restoreVersion(api.pid(), v.id, api.snapshot())); dlg.close(); api.toast("Version restored. Your previous state is saved in History.", true);
+    } catch (e) { api.toast(e.message); }
+    busy(false);
+  }
+  async function remove(v) {
+    if (!(await api.confirm(`“${v.name}” will be permanently deleted from History.`, "Delete this version?", "Delete version", "Keep version"))) return;
+    busy(true); try { await deleteVersion(api.pid(), v.id); await refresh(); } catch (e) { api.toast(e.message); } busy(false);
+  }
+  async function preview(v) {
+    busy(true);
+    try { const full = await getVersion(api.pid(), v.id); dlg.close(); await api.previewVersion({ name: v.name, ...full }); } catch (e) { api.toast(e.message); }
+    busy(false);
+  }
+  $("#hist-btn").onclick = () => { $("#hist-form").hidden = !api.canEdit(); dlg.showModal(); refresh(); };
+  $("#hist-close").onclick = () => dlg.close();
+  $("#hist-form").onsubmit = (e) => { e.preventDefault(); save(); };
+}
