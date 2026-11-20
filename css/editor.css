@@ -120,3 +120,13 @@ body.lay-pdf .panels{grid-template-columns:minmax(0,1fr)}body.lay-pdf .left,body
 .pvpages{display:flex;flex-direction:column;align-items:center;gap:.8rem;position:relative}
 .pgw{background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.22);flex:none}.pgw canvas{display:block;width:100%;height:100%}
 .menu-pop button.on{font-weight:600;color:var(--green)}
+
+/* ---- History and save status ---- */
+#hist-dlg{width:min(40rem,94vw)}.hh{display:flex;justify-content:space-between;align-items:baseline}.hh h2{margin:0}
+.hsave{display:flex;gap:.5rem;margin:.8rem 0}.hsave input{flex:1}
+.hlist{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:.8rem}.hpad{padding:.8rem}
+.hrow{display:flex;gap:.8rem;align-items:center;justify-content:space-between;padding:.6rem .8rem;border-top:1px solid var(--line)}.hrow:first-child{border-top:0}
+.hinfo{min-width:0}.hinfo em{font-size:.72rem;color:var(--muted);font-style:normal;border:1px solid var(--line);border-radius:99px;padding:0 .4rem;margin-left:.4rem}
+.hbtns{display:flex;gap:.3rem;flex-wrap:wrap;justify-content:flex-end}.btn.sm.danger{color:var(--danger)}
+#hist-dlg.busy{pointer-events:none;opacity:.7}
+.save.offline,.save.conflict,.save.error{color:var(--danger);cursor:pointer}
