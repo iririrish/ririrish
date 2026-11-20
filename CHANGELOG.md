@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0] - Phase 6: Cloud Saving and History
+### Added
+- History dialog (`js/history.js`, `js/versions.js`): named versions, date/time, word and chapter counts, preview as PDF, restore, delete; 30-version limit with automatic versions pruned first. Restoring first saves the current manuscript as an automatic version.
+- Conflict protection: revision numbers on chapters and project details, checked in transactions; Reload latest or Keep my version dialog.
+- Offline handling: automatic retry every 8 seconds and when the browser comes back online; clickable Offline, Error and Conflict statuses.
+- Maximum 20 seconds between saves while typing continuously.
+### Changed
+- Autosave writes only chapters whose content changed and updates the project's `updatedAt` once per save instead of once per chapter.
+- Deleting a project also deletes its saved versions.
+- History sits in the header next to Layout.
+### Notes
+- **Republish `firestore.rules`** (new `versions` rules).
+- Existing projects need no migration; revision numbers start at 0.
+- Images deleted after a version was saved cannot be restored.
+
 ## [0.5.0] - Phase 5: PDF and Document Preview
 ### Added
 - PDF layout engine (`js/pdf.js`) on pdf-lib: fonts, margins, double spacing, indents, justified text, section/subsection/2nd subsection styles, lists (all six styles), tables (merged cells, alignment, column widths), figures and captions, title page, approval sheet, abstract with keywords, acknowledgement, chapters, appendix, page numbers (roman front matter, arabic body), table of contents and lists with real page numbers.
