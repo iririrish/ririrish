@@ -7,7 +7,7 @@ Write your thesis. Let ririrish handle the formatting.
 **Permanent development rule:** every change updates `README.md` and adds an entry to `CHANGELOG.md` (new features, bug fixes, changed setup or Firebase steps).
 
 ## Overview
-A thesis-writing site inspired by Overleaf, built for students. It will format manuscripts to the BatStateU Capstone Manuscript template automatically. **Current status: Phase 5 of 9 (PDF and preview).**
+A thesis-writing site inspired by Overleaf, built for students. It will format manuscripts to the BatStateU Capstone Manuscript template automatically. **Current status: Phase 6 of 9 (cloud saving and history).**
 
 ## Features (Phase 1)
 - Sign up, sign in (email or Google), reset password
@@ -32,6 +32,8 @@ A thesis-writing site inspired by Overleaf, built for students. It will format m
 - **Real PDF generation** (`js/pdf.js`, runs in the browser, no server): template fonts, margins, line spacing, indents, justification, headings, lists, tables with merged cells, figures with captions, title page, approval sheet, abstract, acknowledgement, chapters, appendix. Page numbers: title page unnumbered, front matter in roman numerals (ii, iii, ...), body in arabic from Chapter 1. The table of contents, list of tables and list of figures carry real page numbers (calculated over several passes)
 - Live preview panel (PDF.js): green **Recompile**, page counter, previous/next page, zoom in/out, fit width, **Download PDF**, and an "Edited since last compile" hint. The preview shows the actual generated PDF, not an HTML imitation
 - **Layout** menu: Editor + PDF, Editor only, PDF only (remembered per browser); the PDF-only view uses the whole workspace and resizes correctly
+- **History**: save named versions, see the date, time, word count and chapters of each, preview any version as a PDF, restore it, or delete it. Up to 30 versions per project, stored in Firestore so they follow you across devices. Restoring first saves your current manuscript as an automatic version, so it never destroys your work; when the limit is reached, automatic versions are removed first
+- **Safer autosave**: only changed chapters are written, one `updatedAt` write per save, a save at least every 20 seconds while typing, automatic retry when you are offline or the connection drops, a clear Saving / Saved / Offline / Error status (click it to retry), and conflict protection so a second device cannot silently overwrite newer work (you choose Reload latest or Keep my version)
 - Thin, quiet scrollbars
 - Debounced autosave to Firestore with Saving / Saved / Error status; word count and estimated pages
 
@@ -56,6 +58,8 @@ js/images.js        image compression, upload, delete (Supabase + Firestore reco
 js/supabase-config.js  Supabase URL, anon key, bucket name
 js/latex.js         table to LaTeX
 js/pdf.js           PDF layout engine (pdf-lib)
+js/versions.js      version history data (Firestore)
+js/history.js       History dialog
 js/preview.js       PDF.js viewer
 supabase-setup.sql  bucket and policies (run once)
 firestore.rules  CHANGELOG.md  .nojekyll
@@ -76,13 +80,15 @@ firestore.rules  CHANGELOG.md  .nojekyll
 `projects/{projectId}`: `title, authors[], template, ownerId, ownerName, collaborators{uid: role}, collaboratorIds[], sharing, createdAt, updatedAt`.
 `projects/{id}/chapters/{chapterId}`: `kind` (front, main, back), `title`, `order`, `blocks[]` (`id, type p|h1|h2|list, html, align?, listStyle?`), `updatedAt`. One document per chapter keeps each under Firestore's 1 MiB limit and limits writes to the chapter being edited.
 Project document fields added in Phase 3: `meta` (degree, program, specialization, university, campus, college, department, academicYear, submissionDate, introStatement, degreeStatement, approvalStatement, certification, `authorList[]`, `signatories[]`) and `format` (template settings). Existing projects get defaults on first open; nothing is written until you edit.
-Planned: `projects/{id}/versions`, `projects/{id}/lock` (Phases 6, 7).
+`projects/{id}/versions/{versionId}`: `name, auto, createdBy, createdAt, words, chapterCount, snapshot{title, authors, meta, format}` and `projects/{id}/versions/{versionId}/chapters/{chapterId}` (a copy of each chapter).
+Revision numbers: each chapter has a `rev` and the project has `metaRev`; saves check them in a transaction to detect edits made elsewhere.
+Planned: `projects/{id}/lock` (Phase 7).
 
 ### Images (free plan)
 Supabase Storage holds the actual files; Firestore holds only a small record per image, so Firestore stays light. Record at `projects/{id}/images/{imageId}`: `ownerId, fileName, originalName, storagePath, imageUrl, size, width, height, caption, uploadedAt`. Files are saved as `images/{userId}/{projectId}/{imageId}.webp`. Chapter blocks keep the image URL so images show without extra reads. Duplicating a project copies its files; deleting a project deletes its files.
 
 ### Security rules
-Owners create, read, update, delete. Invited users (`collaboratorIds`) can read. Owners can read and write `chapters`; invited users can read them. **Republish `firestore.rules` after updating to this version.** Image records follow the same rule (owner writes, members read). Editor-role writes and edit locks are added in Phase 7.
+Owners create, read, update, delete. Invited users (`collaboratorIds`) can read. Owners can read and write `chapters`; invited users can read them. **Republish `firestore.rules` after updating to this version.** Versions and their chapter copies follow the same rule (owner writes, members read). **Republish `firestore.rules` for Phase 6.** Image records follow the same rule (owner writes, members read). Editor-role writes and edit locks are added in Phase 7.
 
 ## Supabase Storage setup (free, no card needed)
 1. Create a free project at supabase.com. Keep the default spend cap on so it can never bill you.
@@ -100,6 +106,9 @@ Push to your repo, then Settings > Pages > Deploy from branch (`main`, root). Al
 - Image storage needs the Supabase setup above; without it the Image button explains what is missing.
 - Image uploads are limited by the browser's compression to under 2 MB WebP (longest side 1600 px).
 - Changing rows or columns splits any merged cells. Merging uses "merge right" and "merge down" on the active cell rather than drag-selecting a range.
+- Restoring a version brings back text, tables and image references, but not image files you deleted after saving it (deleted images are gone for good).
+- Edits are saved per chapter, so a conflict is reported per chapter; resolve it by reloading or keeping your version for the whole project.
+- Version history is saved on request (and before every restore); there are no automatic timed versions, to stay within free Firestore limits.
 - Deleting an image is permanent and clears undo history for that chapter. Figure and table numbers are continuous through the document.
 - The PDF is built by ririrish's own layout engine, not LaTeX or Word, so line and page breaks can differ slightly from Word. It uses the PDF standard fonts (Times for Times New Roman and Georgia, Helvetica for Arial). Characters outside the Western European set (for example Greek letters) are replaced with "?"; equations arrive later.
 - Front matter is numbered with roman numerals and the body restarts at 1 at Chapter 1 (the sample PDF is ambiguous). Confirm with your adviser.
@@ -116,7 +125,7 @@ Push to your repo, then Settings > Pages > Deploy from branch (`main`, root). Al
 - Projects created before this version, if any, need `ownerId` and `collaboratorIds` fields to appear.
 
 ## Development roadmap
-1 Foundation (done) · 2 Thesis editor (done) · 3 Manuscript formatting (done) · 4 Images and tables (done) · 5 PDF and preview (done) · 6 Cloud saving and history · 7 Sharing and edit lock · 8 Advanced tools · 9 Testing and deployment
+1 Foundation (done) · 2 Thesis editor (done) · 3 Manuscript formatting (done) · 4 Images and tables (done) · 5 PDF and preview (done) · 6 Cloud saving and history (done) · 7 Sharing and edit lock · 8 Advanced tools · 9 Testing and deployment
 
 ## Future tools (not implemented; no buttons in the UI)
 AI Proofread, Rewrite Selection, Explain Selection, Academic Tone, Consistency Checker, Citation Checker, Formatting Inspector, Document Comparison, Adviser Comments, Thesis Rescue, Defense Preparation.
